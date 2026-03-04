@@ -14,4 +14,7 @@ def exp2_true_function(x):
 
 
 def exp2_noise_variance_function(x):
+    # σ²(x) = (0.01 + 0.2*(x-π)²)²
+    # Variance is smallest near x=π and grows away from it.
+    # The floor 0.01 ensures σ²(x) > 0 everywhere.
     return (0.01 + 0.2 * (x - np.pi) ** 2) ** 2
