@@ -1,0 +1,13 @@
+# Config for Stage 2 impact (exp_stage2_impact_arc).
+# Stage 1 fixed in code: n_0=200, r_0=20, t_grid_size=1000.
+# Stage 2: 9 cases (n_1,r_1) x method (lhs, sampling, mixed).
+
+simulator_func = exp1
+n_test = 500
+r_test = 1
+n_cand = 2000
+t_grid_size = 1000
+ell_x = 0.1
+lam = 1e-4
+h = 0.05
+alpha = 0.1

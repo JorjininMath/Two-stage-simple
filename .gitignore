@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# Experiment outputs
+exp2_test/output/
+exp3_test/output/
+exp_stage2_impact_arc/output/
+exp_stage2_impact_arc/slurm_logs/
+temp_exp_code/
+
+# Images generated from experiments
+*.png
+
+# Editor
+.vscode/
+
+# R
+.Rhistory

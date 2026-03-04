@@ -1,0 +1,14 @@
+# exp_test: Branin–Hoo (2D), fixed Gaussian noise. Compare CKME, DCP-DR, hetGP.
+simulator_func = exp_test
+n_0 = 200
+r_0 = 5
+n_1 = 100
+r_1 = 5
+n_test = 500
+r_test = 1
+n_cand = 1000
+t_grid_size = 500
+ell_x = 15.0
+lam = 1e-2
+h = 0.5
+alpha = 0.1
