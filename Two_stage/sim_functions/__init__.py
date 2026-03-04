@@ -1,4 +1,4 @@
-"""Simulators for experiments: exp1, exp2, exp3, exp_test."""
+"""Simulators for experiments: exp1, exp2, exp3, exp_test, and non-Gaussian variants."""
 from __future__ import annotations
 import numpy as np
 from .simulator import make_simulator, make_student_t_simulator
@@ -12,6 +12,9 @@ from .exp3 import (
     EXP3_X_BOUNDS,
 )
 from .exp_test import exp_test_noise_variance_function, EXP_TEST_X_BOUNDS
+from .sim_nongauss_A1 import make_nongauss_A1_simulator
+from .sim_nongauss_B2 import make_nongauss_B2_simulator
+from .sim_nongauss_C1 import make_nongauss_C1_simulator
 
 exp1_simulator = make_simulator(exp1_true_function, exp1_noise_variance_function)
 exp2_simulator = make_simulator(exp2_true_function, exp2_noise_variance_function)
@@ -59,6 +62,10 @@ _EXPERIMENT_REGISTRY = {
     "exp2_test": {"simulator": exp2_test_simulator, "bounds": EXP2_X_BOUNDS, "d": 1},
     "exp3": {"simulator": exp3_simulator, "bounds": EXP3_X_BOUNDS, "d": 2},
     "exp_test": {"simulator": exp_test_simulator, "bounds": EXP_TEST_X_BOUNDS, "d": 2},
+    # Non-Gaussian variants (exp2 true function, default noise params)
+    "nongauss_A1": {"simulator": make_nongauss_A1_simulator(nu=3.0), "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_B2": {"simulator": make_nongauss_B2_simulator(k=2.0),  "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_C1": {"simulator": make_nongauss_C1_simulator(pi=0.05), "bounds": EXP2_X_BOUNDS, "d": 1},
 }
 
 

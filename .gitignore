@@ -1,3 +1,6 @@
+# Local working notes
+PROMPT.md
+
 # macOS
 .DS_Store
 
@@ -11,9 +14,14 @@ __pycache__/
 # Experiment outputs
 exp2_test/output/
 exp3_test/output/
+exp3_test/output/
+exp_nongauss/output/
 exp_stage2_impact_arc/output/
 exp_stage2_impact_arc/slurm_logs/
 temp_exp_code/
+
+# Deprecated legacy implementation (superseded by CKME/ and Two_stage/)
+core/
 
 # Images generated from experiments
 *.png
