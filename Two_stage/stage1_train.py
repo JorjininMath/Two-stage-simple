@@ -82,6 +82,7 @@ def run_stage1_train(
     t_grid_size: int = 100,
     random_state: Optional[int] = None,
     verbose: bool = False,
+    dtype: Optional[type] = None,
 ) -> Stage1TrainResult:
     """
     Step 1: Train CKME model. No S^0, no CP calibration.
@@ -150,15 +151,19 @@ def run_stage1_train(
     if verbose:
         print(f"  Collected {X_all.shape[0]} points ({n_0} sites × {r_0} reps)")
 
-    Y_min, Y_max = Y_all.min(), Y_all.max()
-    t_grid = np.linspace(Y_min, Y_max, t_grid_size)
+    # Use percentile-based bounds to prevent heavy-tail outliers from dominating
+    # the t_grid and causing CDF inversion to clip at the boundary for high τ.
+    Y_lo = np.percentile(Y_all, 0.5)
+    Y_hi = np.percentile(Y_all, 99.5)
+    y_margin = 0.10 * (Y_hi - Y_lo)
+    t_grid = np.linspace(Y_lo - y_margin, Y_hi + y_margin, t_grid_size)
 
     if verbose:
         print("  Fitting model...")
 
     model = CKMEModel(indicator_type=indicator_type)
     if params is not None:
-        model.fit(X=X_all, Y=Y_all, params=params, verbose=verbose)
+        model.fit(X=X_all, Y=Y_all, params=params, r=r_0, verbose=verbose, dtype=dtype)
     else:
         model.fit(
             X=X_all,
@@ -169,6 +174,7 @@ def run_stage1_train(
             cv_folds=cv_folds,
             n_jobs=n_jobs,
             random_state=random_state,
+            r=r_0,
             verbose=verbose,
         )
 

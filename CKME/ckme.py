@@ -36,7 +36,7 @@ import numpy as np
 from .parameters import Params, ParamGrid
 from .kernels import make_x_rbf_kernel
 from .indicators import make_indicator, BaseIndicator
-from .coefficients import build_cholesky_factor, compute_ckme_coeffs
+from .coefficients import build_cholesky_factor, build_cholesky_from_X, compute_ckme_coeffs
 from .cdf import compute_cdf_from_coeffs
 from .tuning import tune_ckme_params, TuningResults
 
@@ -105,6 +105,7 @@ class CKMEModel:
 
         # Store tuning results if parameter tuning was performed
         self.tuning_results: Optional[TuningResults] = None
+        self.r: int = 1  # replications per site (1 = old full-data mode)
 
     def _is_fitted(self) -> bool:
         """Check if the model has been trained."""
@@ -121,7 +122,9 @@ class CKMEModel:
         cv_folds: int = 5,
         random_state: Optional[int] = None,
         n_jobs: int = 1,
+        r: int = 1,
         verbose: bool = False,
+        dtype: Optional[type] = None,
     ) -> "CKMEModel":
         """
         Train the CKME model.
@@ -142,7 +145,12 @@ class CKMEModel:
             Threshold grid for CV. Required only when using param_grid.
         loss_type, cv_folds, random_state, n_jobs, verbose
             Used only when param_grid is provided.
+        dtype : numpy dtype, optional
+            Working precision for the kernel matrix and Cholesky factor.
+            Defaults to float64. Pass np.float32 to halve memory for large n.
+            Only applies to the fixed-params path; CV tuning uses float64.
         """
+        self.r = int(r)
         X = np.atleast_2d(np.asarray(X, dtype=float))
         Y = np.asarray(Y, dtype=float).ravel()
         if X.shape[0] != Y.shape[0]:
@@ -183,9 +191,6 @@ class CKMEModel:
             raise ValueError("Provide either params (fixed) or param_grid (tuning)")
 
         # Store training data and parameters
-        self.X = X
-        self.Y = Y
-        self.n, self.d = X.shape
         self.params = params
 
         # Create smooth indicator object
@@ -194,11 +199,43 @@ class CKMEModel:
         # Build X-kernel with fixed ell_x
         self.kx = make_x_rbf_kernel(params.ell_x)
 
-        # Precompute training Gram matrix K_X
-        self.K_X = self.kx(self.X, self.X)  # shape (n, n)
+        # ------------------------------------------------------------------
+        # Distinct-sites mode (r > 1): fit on n_0 unique sites instead of
+        # n_0 * r_0 total points.  Mathematically equivalent to the full
+        # formulation because the block structure of K_X forces all
+        # coefficients within a site to be equal; averaging g_t(Y) over
+        # replicates per site and solving the n_0 x n_0 system gives the
+        # same CDF estimate with O(r_0^2) memory savings.
+        # ------------------------------------------------------------------
+        if self.r > 1:
+            n_sites = X.shape[0] // self.r
+            # Distinct sites: take every r-th row (sites are stored consecutively)
+            self.X = X[::self.r]                      # (n_0, d)
+            self.Y = Y.reshape(n_sites, self.r)        # (n_0, r)  — Y per site
+            self.n = n_sites
+            self.d = self.X.shape[1]
+        else:
+            self.X = X
+            self.Y = Y
+            self.n, self.d = X.shape
 
-        # Build Cholesky factor of (K_X + n * lam * I)
-        self.L = build_cholesky_factor(self.K_X, self.n, params.lam)
+        # OLD (full n_0*r_0 approach — kept for reference):
+        # self.X = X               # (n_0*r_0, d)
+        # self.Y = Y               # (n_0*r_0,)
+        # self.n, self.d = X.shape
+        # self.K_X = self.kx(self.X, self.X)  # (n_0*r_0)^2
+        # self.L = build_cholesky_factor(self.K_X, self.n, params.lam)
+
+        # Build (K_X + n*lam*I) and its Cholesky factor in a single (n, n)
+        # buffer — avoids materializing K_X separately. For large n this
+        # cuts peak training memory roughly 4x. dtype=float32 halves it again.
+        self.L = build_cholesky_from_X(
+            self.X, params.ell_x, self.n * params.lam, dtype=dtype
+        )
+        if dtype is not None:
+            self.X = self.X.astype(dtype, copy=False)
+        # K_X is no longer cached; predict() only needs L and X.
+        self.K_X = None
 
         return self
 
@@ -208,6 +245,7 @@ class CKMEModel:
         t_grid: Optional[Union[ArrayLike, float]] = None,
         t: Optional[float] = None,
         clip: bool = True,
+        monotone: bool = False,
     ) -> ArrayLike:
         """
         Predict conditional CDF F(t | x) for query inputs.
@@ -228,6 +266,12 @@ class CKMEModel:
             If True, clip the resulting CDF values to [0, 1]. This is sometimes
             useful numerically because the RKHS representation can produce
             values slightly outside [0, 1].
+
+        monotone : bool, default=False
+            If True, apply isotonic regression to enforce monotonicity of F(t | x)
+            along t for each query point. Requires scikit-learn.
+            Useful when the raw CKME estimate has minor non-monotonicities due to
+            the smoothed indicator approximation or regularization.
 
         Returns
         -------
@@ -255,16 +299,248 @@ class CKMEModel:
         is_single_threshold = np.isscalar(t_grid)
         t_grid = np.asarray([t_grid] if is_single_threshold else t_grid, dtype=float).ravel()
 
-        # Compute coefficients for query points
-        C = compute_ckme_coeffs(self.L, self.kx, self.X, X_query)  # shape (n, q)
+        # Compute coefficients for query points: shape (n_sites, q)
+        C = compute_ckme_coeffs(self.L, self.kx, self.X, X_query)
 
-        # Compute CDF using indicator method
-        F = compute_cdf_from_coeffs(C, self.Y, self.indicator, t_grid, clip=clip)  # shape (q, M)
+        if self.r > 1:
+            # Distinct-sites mode: G_bar[j, m] = mean_k g_{t_m}(Y[j, k])
+            # self.Y has shape (n_sites, r); compute per-site empirical CDF values
+            # OLD (full-data path):
+            # F = compute_cdf_from_coeffs(C, self.Y.ravel(), self.indicator, t_grid, clip=clip)
+            Y_flat = self.Y.ravel()                               # (n_sites * r,)
+            G_all  = self.indicator.g_matrix(Y_flat, t_grid)     # (n_sites * r, M)
+            G_bar  = G_all.reshape(self.n, self.r, -1).mean(axis=1)  # (n_sites, M)
+            F = C.T @ G_bar                                       # (q, M)
+            if clip:
+                F = np.clip(F, 0.0, 1.0)
+        else:
+            # OLD full-data mode (r=1, or single observation per site)
+            F = compute_cdf_from_coeffs(C, self.Y, self.indicator, t_grid, clip=clip)  # (q, M)
+
+        # Optionally enforce monotonicity via isotonic regression
+        if monotone and not is_single_threshold and F.shape[1] > 1:
+            from sklearn.isotonic import IsotonicRegression
+            _ir = IsotonicRegression(increasing=True, out_of_bounds="clip")
+            t_idx = np.arange(F.shape[1], dtype=float)
+            for i in range(F.shape[0]):
+                F[i] = _ir.fit_transform(t_idx, F[i])
 
         # Return scalar result if single threshold was provided
         if is_single_threshold:
             return F[:, 0]
         return F
+
+    def predict_quantile(
+        self,
+        X_query: ArrayLike,
+        tau: float,
+        t_grid: ArrayLike,
+        monotone: bool = True,
+    ) -> ArrayLike:
+        """
+        Predict conditional quantile q_τ(x) = inf{y : F(y | x) ≥ τ} for query inputs.
+
+        This is CDF inversion on t_grid: for each query point, find the first
+        grid value where the estimated conditional CDF reaches τ.
+
+        Parameters
+        ----------
+        X_query : array-like, shape (q, d) or (d,)
+            Query input points.
+
+        tau : float
+            Quantile level in (0, 1). E.g., 0.1 for 10th percentile.
+
+        t_grid : array-like, shape (M,)
+            Dense grid of Y values for inversion. Should cover the range of Y.
+
+        monotone : bool, default=True
+            If True (default), apply isotonic regression to enforce CDF monotonicity
+            before inverting. Strongly recommended: a non-monotone CDF can cause
+            argmax to return the wrong crossing point. Requires scikit-learn.
+
+        Returns
+        -------
+        q_tau : ndarray, shape (q,)
+            Estimated conditional quantile at level tau for each query point.
+            If F(t | x) never reaches tau on the grid, returns t_grid[-1].
+        """
+        t_grid = np.asarray(t_grid, dtype=float).ravel()
+        F = self.predict_cdf(X_query, t_grid, monotone=monotone)  # shape (q, M)
+        mask = F >= tau                         # shape (q, M)
+        has_valid = mask.any(axis=1)            # shape (q,)
+        idx = mask.argmax(axis=1)               # first True per row; 0 if no True
+        n_clipped = int((~has_valid).sum())
+        if n_clipped > 0:
+            import warnings
+            warnings.warn(
+                f"predict_quantile: CDF did not reach tau={tau:.3f} for "
+                f"{n_clipped}/{len(has_valid)} query points; clipping to t_grid[-1]={t_grid[-1]:.4f}. "
+                "Consider widening t_grid or using percentile-based bounds.",
+                stacklevel=2,
+            )
+        return np.where(has_valid, t_grid[idx], t_grid[-1])
+
+    def predict_quantile_solve(
+        self,
+        X_query: ArrayLike,
+        tau: float,
+        t_lo: Optional[float] = None,
+        t_hi: Optional[float] = None,
+        xtol: float = 1e-6,
+    ) -> ArrayLike:
+        """
+        Predict conditional quantile q_τ(x) by directly solving F(t|x) = τ.
+
+        Unlike predict_quantile, this method does NOT require a t_grid.
+        The algorithm branches on indicator type:
+
+        **Smooth indicators (logistic, gaussian_cdf, softplus)**
+            F(t|x) = Σᵢ cᵢ(x)·g_t(Yᵢ) is a smooth function of t.
+            Uses scipy.optimize.brentq to solve F(t|x) − τ = 0.
+            Avoids both discretisation error and truncation bias.
+            Assumes approximate monotonicity (holds for well-regularised fits;
+            CKME coefficients can be negative so strict monotonicity is not
+            guaranteed).
+
+        **Step indicator**
+            F(t|x) = Σᵢ cᵢ(x)·1{Yᵢ ≤ t} is a weighted empirical CDF —
+            a step function that only jumps at the training Y values.
+            The exact quantile is found by sorting the training Y values,
+            computing the cumulative weighted coefficient sum, and returning
+            the first Y where that sum reaches τ.  This is O(n log n),
+            fully vectorised over query points, and requires no root-finding.
+            For r > 1: each observation (site j, rep k) gets weight cⱼ(x)/r,
+            so the same sort-and-scan logic applies to the flattened arrays.
+
+        Parameters
+        ----------
+        X_query : array-like, shape (q, d) or (d,)
+            Query input points.
+
+        tau : float
+            Quantile level in (0, 1).
+
+        t_lo, t_hi : float, optional
+            Search bracket for brentq (smooth indicators only).
+            If omitted, inferred from training Y:
+              t_lo = percentile(Y, 0.1) − 5·h
+              t_hi = percentile(Y, 99.9) + 5·h
+            Ignored for step indicator.
+
+        xtol : float, default=1e-6
+            Absolute tolerance passed to brentq (smooth indicators only).
+
+        Returns
+        -------
+        q_tau : ndarray, shape (q,)
+            Estimated conditional quantile at level tau for each query point.
+            Clipped to t_lo / t_hi (smooth) or Y_min / Y_max (step) when
+            the cumulative sum never reaches tau inside the range.
+        """
+        import warnings
+
+        if not self._is_fitted():
+            raise ValueError("Model has not been trained. Call fit() first.")
+        if not (0.0 < tau < 1.0):
+            raise ValueError(f"tau must be in (0, 1), got {tau}")
+
+        X_query = np.atleast_2d(np.asarray(X_query, dtype=float))
+        q = X_query.shape[0]
+        Y_flat = self.Y.ravel()  # (n_sites * r,) or (n,)
+
+        # Compute CKME coefficients once: shape (n_sites, q)
+        C = compute_ckme_coeffs(self.L, self.kx, self.X, X_query)
+
+        # ------------------------------------------------------------------
+        # Branch: step indicator — exact weighted-ECDF inversion
+        # ------------------------------------------------------------------
+        if self.indicator_type == "step":
+            # Build flat (observation, query) arrays.
+            # Each observation i has weight c_j(x) / r for query point j.
+            if self.r > 1:
+                # C has shape (n_sites, q); expand to (n_sites * r, q)
+                C_flat = np.repeat(C, self.r, axis=0) / self.r  # (n*r, q)
+            else:
+                C_flat = C  # (n, q)
+
+            # Sort observations by Y value
+            sort_idx = np.argsort(Y_flat)               # (n_obs,)
+            Y_sorted = Y_flat[sort_idx]                  # (n_obs,)
+            C_sorted = C_flat[sort_idx, :]               # (n_obs, q)
+
+            # Cumulative weighted sum along the Y axis: shape (n_obs, q)
+            cum = np.cumsum(C_sorted, axis=0)
+
+            # For each query point j, find first index where cum[:, j] >= tau
+            mask = cum >= tau                             # (n_obs, q)
+            has_valid = mask.any(axis=0)                 # (q,)
+            idx = mask.argmax(axis=0)                    # (q,) — 0 if no True
+
+            n_hi_clip = int((~has_valid).sum())
+            if n_hi_clip > 0:
+                warnings.warn(
+                    f"predict_quantile_solve (step): cumulative weight never "
+                    f"reached tau={tau:.3f} for {n_hi_clip}/{q} query points; "
+                    f"clipping to Y_max={Y_sorted[-1]:.4f}.",
+                    stacklevel=2,
+                )
+            return np.where(has_valid, Y_sorted[idx], Y_sorted[-1])
+
+        # ------------------------------------------------------------------
+        # Branch: smooth indicators — brentq root finding
+        # ------------------------------------------------------------------
+        from scipy.optimize import brentq
+
+        h = self.params.h
+        if t_lo is None:
+            t_lo = float(np.percentile(Y_flat, 0.1)) - 5.0 * h
+        if t_hi is None:
+            t_hi = float(np.percentile(Y_flat, 99.9)) + 5.0 * h
+
+        def _F_at_t(t: float, c_j: np.ndarray) -> float:
+            """Evaluate F(t | x_j) for coefficient vector c_j."""
+            if self.r > 1:
+                g_all = self.indicator.g_vector(Y_flat, t)         # (n_sites * r,)
+                g_bar = g_all.reshape(self.n, self.r).mean(axis=1) # (n_sites,)
+                return float(np.dot(c_j, g_bar))
+            else:
+                g = self.indicator.g_vector(self.Y, t)             # (n,)
+                return float(np.dot(c_j, g))
+
+        results = np.empty(q)
+        n_lo_clip = 0
+        n_hi_clip = 0
+        for j in range(q):
+            c_j = C[:, j]
+            f_lo = _F_at_t(t_lo, c_j) - tau
+            f_hi = _F_at_t(t_hi, c_j) - tau
+
+            if f_lo >= 0.0:
+                results[j] = t_lo
+                n_lo_clip += 1
+            elif f_hi < 0.0:
+                results[j] = t_hi
+                n_hi_clip += 1
+            else:
+                results[j] = brentq(
+                    lambda t: _F_at_t(t, c_j) - tau,
+                    t_lo, t_hi, xtol=xtol,
+                )
+
+        if n_lo_clip > 0:
+            warnings.warn(
+                f"predict_quantile_solve: F(t_lo|x) >= tau for {n_lo_clip}/{q} "
+                f"points; clipping to t_lo={t_lo:.4f}. Consider lowering t_lo.",
+                stacklevel=2,
+            )
+        if n_hi_clip > 0:
+            warnings.warn(
+                f"predict_quantile_solve: F(t_hi|x) < tau for {n_hi_clip}/{q} "
+                f"points; clipping to t_hi={t_hi:.4f}. Consider raising t_hi.",
+                stacklevel=2,
+            )
+        return results
 
     def save(self, path: Union[str, Path]) -> None:
         """
@@ -276,12 +552,13 @@ class CKMEModel:
         np.savez_compressed(
             path,
             X=self.X,
-            Y=self.Y,
+            Y=self.Y,   # shape (n_sites, r) if r>1, else (n,)
             L=self.L,
             ell_x=self.params.ell_x,
             lam=self.params.lam,
             h=self.params.h,
             indicator_type=np.array([self.indicator_type], dtype=object),
+            r=np.array(self.r),
         )
 
     @classmethod
@@ -291,8 +568,9 @@ class CKMEModel:
         indicator_type = str(data["indicator_type"].item())
         model = cls(indicator_type=indicator_type)
         model.X = data["X"]
-        model.Y = data["Y"]
+        model.Y = data["Y"]   # (n_sites, r) if r>1, else (n,)
         model.L = data["L"]
+        model.r = int(data["r"]) if "r" in data else 1  # backward compat
         model.n, model.d = model.X.shape
         model.params = Params(
             ell_x=float(data["ell_x"]),
@@ -301,5 +579,6 @@ class CKMEModel:
         )
         model.indicator = make_indicator(indicator_type, model.params.h)
         model.kx = make_x_rbf_kernel(model.params.ell_x)
-        model.K_X = model.kx(model.X, model.X)
+        # K_X is not cached: predict() only needs L and X.
+        model.K_X = None
         return model
