@@ -28,9 +28,8 @@
 set -euo pipefail
 
 # ---- environment ----
-module purge
-module load Miniforge3
-source activate ckme_env   # change to your conda env name if different
+source /apps/common/software/Miniforge3/25.11.0-1/etc/profile.d/conda.sh
+conda activate ckme_env
 
 # ---- paths ----
 cd "$SLURM_SUBMIT_DIR"
