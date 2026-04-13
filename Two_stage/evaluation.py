@@ -30,7 +30,14 @@ def _compute_score_coverage(
     from CP.scores import score_from_cdf
 
     C = compute_ckme_coeffs(model.L, model.kx, model.X, X_test)
-    G = model.indicator.g_matrix(model.Y, Y_test)
+    if getattr(model, 'r', 1) > 1:
+        # Distinct-sites mode
+        # OLD: G = model.indicator.g_matrix(model.Y, Y_test)
+        Y_flat = model.Y.ravel()
+        G_all  = model.indicator.g_matrix(Y_flat, Y_test)
+        G      = G_all.reshape(model.n, model.r, -1).mean(axis=1)
+    else:
+        G = model.indicator.g_matrix(model.Y, Y_test)
     F_test = np.sum(C * G, axis=0).astype(float)
     np.clip(F_test, 0.0, 1.0, out=F_test)
     scores = score_from_cdf(F_test, score_type=score_type)

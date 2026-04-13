@@ -59,5 +59,7 @@ def collect_stage1_data(
         X_bounds = exp_config["bounds"]
     X_design = generate_space_filling_design(n_0, d, method=design_method, bounds=X_bounds, random_state=random_state)
     X_all = np.repeat(X_design, r_0, axis=0)
-    Y_all = sim(X_all, random_state=random_state)
+    # Use a different seed for the simulator so design and noise are independently seeded.
+    sim_seed = None if random_state is None else random_state + 1
+    Y_all = sim(X_all, random_state=sim_seed)
     return X_all, np.asarray(Y_all).ravel()

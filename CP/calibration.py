@@ -89,8 +89,15 @@ def calibrate(
         raise ValueError("calibrate only supports CKMEModel")
 
     from CKME.coefficients import compute_ckme_coeffs
-    C_cal = compute_ckme_coeffs(model.L, model.kx, model.X, X_cal)  # shape (n, n_cal)
-    G_cal = model.indicator.g_matrix(model.Y, Y_cal)  # shape (n, n_cal)
+    C_cal = compute_ckme_coeffs(model.L, model.kx, model.X, X_cal)  # (n_sites, n_cal)
+    if getattr(model, 'r', 1) > 1:
+        # Distinct-sites mode: average g_t(Y) over replicates per site
+        # OLD: G_cal = model.indicator.g_matrix(model.Y, Y_cal)  # (n_0*r, n_cal)
+        Y_flat = model.Y.ravel()                                  # (n_sites * r,)
+        G_all  = model.indicator.g_matrix(Y_flat, Y_cal)          # (n_sites*r, n_cal)
+        G_cal  = G_all.reshape(model.n, model.r, -1).mean(axis=1) # (n_sites, n_cal)
+    else:
+        G_cal = model.indicator.g_matrix(model.Y, Y_cal)          # (n, n_cal)
     F_cal = np.sum(C_cal * G_cal, axis=0)  # shape (n_cal,)
     np.clip(F_cal, 0.0, 1.0, out=F_cal)
 

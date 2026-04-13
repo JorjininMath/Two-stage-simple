@@ -91,10 +91,10 @@ def select_stage2_sites(
     else:
         probs = weighted_scores / np.sum(weighted_scores)
 
+    rng = np.random.default_rng(random_state)
+
     if method == "sampling":
-        if random_state is not None:
-            np.random.seed(random_state)
-        idx = np.random.choice(n_cand, size=n_1, replace=False, p=probs)
+        idx = rng.choice(n_cand, size=n_1, replace=False, p=probs)
         return X_cand[idx]
 
     # mixed
@@ -103,9 +103,6 @@ def select_stage2_sites(
     gamma = mixed_ratio
     n_lhs = int(np.round((1.0 - gamma) * n_1))
     n_density = n_1 - n_lhs
-
-    if random_state is not None:
-        np.random.seed(random_state)
 
     selected_indices = []
 
@@ -129,16 +126,14 @@ def select_stage2_sites(
         else:
             p_rem = probs[remaining]
             p_rem = p_rem / p_rem.sum()
-            idx = np.random.choice(
-                len(remaining), size=n_needed, replace=False, p=p_rem
-            )
+            idx = rng.choice(len(remaining), size=n_needed, replace=False, p=p_rem)
             selected_indices.extend(remaining[idx].tolist())
     if len(selected_indices) > n_1:
         selected_indices = selected_indices[:n_1]
     elif len(selected_indices) < n_1:
         remaining = np.setdiff1d(np.arange(n_cand), selected_indices)
         n_fill = n_1 - len(selected_indices)
-        fill_idx = np.random.choice(
+        fill_idx = rng.choice(
             len(remaining), size=min(n_fill, len(remaining)), replace=False
         )
         selected_indices.extend(remaining[fill_idx].tolist())

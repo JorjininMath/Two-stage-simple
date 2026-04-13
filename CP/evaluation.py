@@ -183,7 +183,14 @@ def evaluate_cp(
         # Vectorized: F(Y[i]|X[i]) for all i in one batch (like R; avoids n_test separate CDF calls)
         # C (n_train, n_test), G (n_train, n_test) with G[:,j]=g_{Y[j]}(Y_train), F[j]=C[:,j]^T @ G[:,j]
         C = compute_ckme_coeffs(model.L, model.kx, model.X, X_test)
-        G = model.indicator.g_matrix(model.Y, Y_test)
+        if getattr(model, 'r', 1) > 1:
+            # Distinct-sites mode: average g_t(Y) over replicates per site
+            # OLD: G = model.indicator.g_matrix(model.Y, Y_test)
+            Y_flat = model.Y.ravel()
+            G_all  = model.indicator.g_matrix(Y_flat, Y_test)
+            G      = G_all.reshape(model.n, model.r, -1).mean(axis=1)
+        else:
+            G = model.indicator.g_matrix(model.Y, Y_test)
         F_test = np.sum(C * G, axis=0).astype(float)
         np.clip(F_test, 0.0, 1.0, out=F_test)
         scores_test = score_from_cdf(F_test, score_type=score_type)

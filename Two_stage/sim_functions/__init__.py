@@ -15,6 +15,11 @@ from .exp_test import exp_test_noise_variance_function, EXP_TEST_X_BOUNDS
 from .sim_nongauss_A1 import make_nongauss_A1_simulator
 from .sim_nongauss_B2 import make_nongauss_B2_simulator
 from .sim_nongauss_C1 import make_nongauss_C1_simulator
+from .sim_branin_gauss import branin_gauss_simulator, BRANIN_GAUSS_X_BOUNDS
+from .sim_branin_student import branin_student_simulator, BRANIN_STUDENT_X_BOUNDS
+from .sim_sigma_t10 import exp3_alloc_simulator, EXP3_ALLOC_X_BOUNDS
+from .sim_gibbs_s1 import gibbs_s1_simulator, GIBBS_S1_X_BOUNDS
+from .sim_gibbs_s2 import gibbs_s2_simulator, GIBBS_S2_X_BOUNDS
 
 exp1_simulator = make_simulator(exp1_true_function, exp1_noise_variance_function)
 exp2_simulator = make_simulator(exp2_true_function, exp2_noise_variance_function)
@@ -62,10 +67,23 @@ _EXPERIMENT_REGISTRY = {
     "exp2_test": {"simulator": exp2_test_simulator, "bounds": EXP2_X_BOUNDS, "d": 1},
     "exp3": {"simulator": exp3_simulator, "bounds": EXP3_X_BOUNDS, "d": 2},
     "exp_test": {"simulator": exp_test_simulator, "bounds": EXP_TEST_X_BOUNDS, "d": 2},
-    # Non-Gaussian variants (exp2 true function, default noise params)
-    "nongauss_A1": {"simulator": make_nongauss_A1_simulator(nu=3.0), "bounds": EXP2_X_BOUNDS, "d": 1},
-    "nongauss_B2": {"simulator": make_nongauss_B2_simulator(k=2.0),  "bounds": EXP2_X_BOUNDS, "d": 1},
-    "nongauss_C1": {"simulator": make_nongauss_C1_simulator(pi=0.05), "bounds": EXP2_X_BOUNDS, "d": 1},
+    # Non-Gaussian variants (exp2 true function, sigma_tar(x) = 0.1 + 0.1*(x-pi)^2)
+    # Small (light non-Gaussianity)
+    "nongauss_A1S": {"simulator": make_nongauss_A1_simulator(nu=10.0), "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_B2S": {"simulator": make_nongauss_B2_simulator(k=9.0),   "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_C1S": {"simulator": make_nongauss_C1_simulator(pi=0.02), "bounds": EXP2_X_BOUNDS, "d": 1},
+    # Large (strong non-Gaussianity)
+    "nongauss_A1L": {"simulator": make_nongauss_A1_simulator(nu=3.0),  "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_B2L": {"simulator": make_nongauss_B2_simulator(k=2.0),   "bounds": EXP2_X_BOUNDS, "d": 1},
+    "nongauss_C1L": {"simulator": make_nongauss_C1_simulator(pi=0.10), "bounds": EXP2_X_BOUNDS, "d": 1},
+    # Branin-Hoo (2D) with two noise settings
+    "branin_gauss":   {"simulator": branin_gauss_simulator,   "bounds": BRANIN_GAUSS_X_BOUNDS,   "d": 2},
+    "branin_student": {"simulator": branin_student_simulator, "bounds": BRANIN_STUDENT_X_BOUNDS,  "d": 2},
+    # exp3_alloc: exp2 true function + Student-t nu=3 noise (sigma(x) scale)
+    "exp3_alloc":     {"simulator": exp3_alloc_simulator,     "bounds": EXP3_ALLOC_X_BOUNDS,      "d": 1},
+    # Gibbs et al. (RLCP) DGPs — location-scale, X in [-3,3]
+    "gibbs_s1":       {"simulator": gibbs_s1_simulator,       "bounds": GIBBS_S1_X_BOUNDS,         "d": 1},
+    "gibbs_s2":       {"simulator": gibbs_s2_simulator,       "bounds": GIBBS_S2_X_BOUNDS,         "d": 1},
 }
 
 
