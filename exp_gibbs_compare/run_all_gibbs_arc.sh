@@ -29,7 +29,7 @@ set -euo pipefail
 
 # ---- environment ----
 module purge
-module load Miniconda3
+module load Miniforge3
 source activate ckme_env   # change to your conda env name if different
 
 # ---- paths ----
