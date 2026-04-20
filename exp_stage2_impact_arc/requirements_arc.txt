@@ -1,6 +1,0 @@
-# Python deps for exp_stage2_impact_arc on ARC (install once in a conda env)
-numpy
-pandas
-openpyxl
-scipy
-scikit-learn
