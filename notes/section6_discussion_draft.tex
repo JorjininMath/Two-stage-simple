@@ -1,0 +1,95 @@
+% ============================================================
+% Proposed revision of Section 6: Discussion and Future Directions
+% Sources: WSC_CKME_040226.pdf (current draft) + note2 + note3
+% Status: DRAFT — update after non-Gaussian experiments complete
+% ============================================================
+
+\section{Discussion and Future Directions}
+\label{sec:discussion}
+
+In this paper, we propose CKME--DCP, a distribution-free framework for
+constructing prediction intervals under heteroscedasticity, implemented
+as a two-stage procedure.
+Stage~1 fits a conditional CDF estimator via CKME; Stage~2 allocates
+additional simulation budget to selected input sites and performs split
+DCP to calibrate the nonconformity scores.
+Empirically, CKME--DCP attains nominal marginal coverage and yields
+lower interval scores than DCP--DR across all tested configurations.
+Against hetGP, CKME--DCP is competitive under Gaussian noise and
+behaves more reliably under heavy-tailed distributions: hetGP tends to
+overcover and produce unnecessarily wide intervals when the Gaussian
+assumption is violated.
+Regarding Stage~2 budget allocation, expanding site coverage by
+increasing $n_2$ is more beneficial than increasing per-site
+replications $r_2$.
+
+\paragraph{Score homogeneity as the key mechanism.}
+The advantage of CKME--DCP over quantile-first methods is not merely
+empirical---it has a structural explanation rooted in the \emph{score
+homogeneity} property of CDF-based nonconformity scores.
+Under a location-scale model $Y = f(x) + \sigma(x)\varepsilon$, the
+abs-median score $s(x,y) = |\hat{F}(y \mid x) - 0.5|$ has a score
+distribution that depends on $x$ through the effective bandwidth
+$h_{\mathrm{eff}}(x) = h/\sigma(x)$.
+With a fixed CV-tuned bandwidth $h$, this ratio varies across the
+input space, producing heterogeneous score distributions and a mild
+U-shaped coverage profile observed in our experiments.
+In contrast, an \emph{adaptive} bandwidth $h(x) = c\,\sigma(x)$
+makes $h_{\mathrm{eff}}(x) = c$ constant, so the score distribution
+becomes $x$-independent and a single calibration threshold provides
+uniform conditional coverage.
+Y-space scores (used by DCP--DR) carry an irremovable structural gap:
+under heteroscedasticity, the total variation distance between the
+score distributions at two input locations $x, x'$ satisfies
+$d_{\mathrm{TV}}(F_{s|x}, F_{s|x'}) > 0$ even as $n \to \infty$,
+which explains the persistent spatial non-uniformity seen in DCP--DR results.
+
+\paragraph{Group conditional coverage.}
+Beyond marginal validity, the empirical coverage of CKME--DCP remains
+spatially uniform across input-space bins.
+In our experiments ($K = 10$ equal-width bins of $[0, 2\pi]$,
+$M = 11$ macroreplications), the maximum bin-level deviation from the
+90\% target is at most 0.10 for CKME--DCP across all six simulator
+configurations---below the binomial sampling-noise floor of
+approximately 0.17 for bin size $n_k \approx 100$, indicating the
+structural gap is negligible.
+By contrast, DCP--DR exhibits maximum bin deviations up to 0.33,
+which exceed the binomial floor by a factor of approximately two and
+are attributable to the non-vanishing structural gap described above.
+hetGP is spatially flat but globally miscalibrated
+(up to 97.5\% on the Gaussian-mixture simulator), reflecting
+distributional misspecification rather than spatial non-uniformity.
+
+\paragraph{Future directions.}
+Several extensions follow naturally.
+%
+First, the current experiments use fixed CV-tuned bandwidth $h$.
+Implementing a location-adaptive bandwidth $h(x) = c\,\hat\sigma(x)$,
+where $\hat\sigma(x)$ is a Stage~1 variance estimate, is expected to
+tighten the score homogeneity and improve coverage uniformity,
+particularly at the domain boundaries where $\sigma(x)$ is large.
+%
+Second, the present evaluation considers Gaussian and Student-$t$
+noise. A broader study covering skewed (Gamma) and bimodal (Gaussian
+mixture) noise families---with both mild and severe departures from
+Gaussianity---will characterize how distributional shape affects CDF
+estimation and conformal calibration.
+%
+Third, the relative contributions of the two-stage design's components
+(the $S^0$ uncertainty score, the staged data split, the smooth
+indicator, and CV hyperparameter tuning) remain to be quantified
+individually; a systematic ablation study is planned.
+%
+Fourth, the current theoretical analysis addresses marginal validity
+(Theorem~2) and consistency of the CDF estimator (Theorem~1).
+Formalizing the adaptive-bandwidth score homogeneity argument into a
+finite-sample conditional coverage bound, and establishing the
+corresponding group-conditional guarantee, are directions for future
+theoretical work.
+%
+Fifth, alternative calibration schemes such as Jackknife$+$ and
+cross-conformal variants may provide further efficiency improvements
+for CKME--DCP, particularly in small-sample regimes.
+
+\end{document}
+% ============================================================

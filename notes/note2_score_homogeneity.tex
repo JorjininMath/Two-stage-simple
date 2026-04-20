@@ -1,0 +1,1460 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{xcolor}
+
+% ---------------------------------------------------------------
+% Paper/note toggle: compile with \papertrue for paper-ready output
+% (hides development notes, intro, §7 connection, verbose phases)
+% Default: \paperfalse = full working note
+% ---------------------------------------------------------------
+\newif\ifpaper
+\paperfalse   % change to \papertrue to get paper-ready section
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\ifpaper
+  \title{Adaptive Bandwidth, Score Homogeneity, and\\
+    Conditional Coverage in CKME-CP}
+  \author{}
+  \date{}
+\else
+  \title{Note~2: Score Homogeneity Mechanism\\
+    {\large Adaptive Bandwidth, Uniform Bias, and Conditional Coverage}}
+  \author{Working Note --- CKME-CP Project}
+  \date{April 2026}
+\fi
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We identify a new regime for conformal prediction with CDF-based
+scores: when the bandwidth of the smooth indicator function is
+proportional to the local noise scale, the conformal score distribution
+becomes approximately $x$-independent, even though the underlying CDF
+estimate is biased. This ``score homogeneity'' property ensures that a
+single calibration threshold provides uniform conditional coverage ---
+a guarantee unavailable to fixed-bandwidth estimators or
+quantile-first methods. We formalize the mechanism through the concept
+of \emph{effective bandwidth in standardized scale}, prove an
+over-smoothed collapse proposition showing what fails when homogeneity
+is achieved trivially, and validate the theory with a three-phase
+experiment covering mild, extreme, and non-Gaussian heteroscedasticity.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+
+%% ====================================================================
+% NOTE-ONLY: introduction is replaced by a brief paragraph in paper mode
+\ifpaper\else
+\section{Introduction}
+\label{sec:intro}
+%% ====================================================================
+
+Split conformal prediction (CP) calibrates a prediction set by
+choosing a threshold $\hat{q}$ such that
+$P(s(X, Y) \le \hat{q}) \ge 1 - \alpha$ on fresh calibration data.
+This guarantees \emph{marginal} coverage, but conditional coverage
+$P(Y \in C(x) \mid X = x) \ge 1 - \alpha$ requires additional
+structure.
+
+Existing theory identifies two regimes:
+\begin{enumerate}
+  \item \textbf{Regime~1 (consistency):} If the score converges to the
+    oracle score uniformly, conditional coverage follows. This requires
+    the estimator to be consistent.
+  \item \textbf{Regime~2 (no structure):} Without consistency or
+    additional structure, only marginal coverage holds.
+\end{enumerate}
+
+We identify a \textbf{third regime}: the CDF estimator may be biased,
+but if the bias structure is \emph{spatially homogeneous} --- i.e., the
+score distribution $F_{s|x}$ does not depend on $x$ --- then the single
+CP threshold $\hat{q}$ simultaneously satisfies the conditional
+coverage inequality at every $x$. We call this \textbf{score
+homogeneity}.
+
+The key insight is that score homogeneity can be achieved by a simple
+design choice: setting the CKME bandwidth proportional to the local
+noise scale, $h(x) = c\,\sigma(x)$. This makes the effective bandwidth
+constant in standardized coordinates, producing a common smoothed CDF
+estimate for all $x$.
+
+This note formalizes the mechanism, proves when it succeeds and when it
+degenerates, and validates the theory experimentally.
+\fi % end \ifpaper\else for Introduction
+
+
+%% ====================================================================
+\section{Setup and Notation}
+\label{sec:notation}
+%% ====================================================================
+
+\paragraph{Data model.}
+$Y = f(x) + \sigma(x)\varepsilon$, where $f(x) = E[Y \mid X = x]$,
+$\sigma(x) > 0$ is the conditional noise scale, and
+$\varepsilon \sim G(\cdot)$ with $E[\varepsilon] = 0$,
+$\mathrm{Var}(\varepsilon) = 1$, independent of $x$.
+
+\paragraph{CKME CDF estimator.}
+Given training data $(X_i, Y_{ij})$ ($i = 1,\ldots,n$;
+$j = 1,\ldots,r$), CKME estimates:
+\begin{equation}
+\label{eq:ckme-cdf}
+  \hat{F}(y \mid x) = \sum_{i=1}^{n} c_i(x) \left[
+    \frac{1}{r} \sum_{j=1}^{r} \Psi\!\left(\frac{y - Y_{ij}}{h}\right)
+  \right],
+\end{equation}
+where $\Psi(u) = 1/(1+e^{-u})$ is the logistic CDF,
+$h > 0$ is the bandwidth, and $c_i(x)$ are kernel regression weights
+satisfying $\sum_i c_i(x) \approx 1$.
+
+\paragraph{Conformal score.}
+The abs-median score is:
+\begin{equation}
+\label{eq:score}
+  s(x, y) = |\hat{F}(y \mid x) - 0.5|.
+\end{equation}
+
+\paragraph{Standardized coordinates.}
+Define $z = (y - f(x))/\sigma(x)$ and
+$Z_{ij} = (Y_{ij} - f(x))/\sigma(x)$.
+
+
+%% ====================================================================
+\section{Adaptive Bandwidth and Score Homogeneity}
+\label{sec:mechanism}
+%% ====================================================================
+
+% ------------------------------------------------------------------
+\subsection{The Effective Bandwidth}
+\label{sec:h-eff}
+% ------------------------------------------------------------------
+
+The smooth indicator in~\eqref{eq:ckme-cdf} evaluates:
+\[
+  \Psi\!\left(\frac{y - Y_{ij}}{h}\right)
+  = \Psi\!\left(\frac{(y - f(x)) - (Y_{ij} - f(x))}{h}\right)
+  = \Psi\!\left(\frac{\sigma(x)(z - Z_{ij})}{h}\right)
+  = \Psi\!\left(\frac{z - Z_{ij}}{h/\sigma(x)}\right).
+\]
+
+\begin{definition}[Effective bandwidth]
+\label{def:h-eff}
+The \textbf{effective bandwidth in standardized scale} is
+\begin{equation}
+\label{eq:h-eff}
+  h_{\mathrm{eff}}(x) \;=\; \frac{h}{\sigma(x)}.
+\end{equation}
+It controls the smoothing applied to the standardized noise CDF
+$G(z)$: a larger $h_{\mathrm{eff}}$ produces a smoother (more biased)
+estimate.
+\end{definition}
+
+\paragraph{Intuition.}
+The bandwidth $h$ operates in the original $y$-scale, but the ``natural
+unit'' for smoothing is the noise scale $\sigma(x)$. When $h$ is
+fixed, the estimator over-smooths where noise is small and
+under-smooths where noise is large.
+
+% ------------------------------------------------------------------
+\subsection{Fixed vs.\ Adaptive Bandwidth}
+\label{sec:fixed-vs-adaptive}
+% ------------------------------------------------------------------
+
+\begin{proposition}[Score homogeneity under adaptive bandwidth]
+\label{prop:homogeneity}
+Under the location-scale model $Y = f(x) + \sigma(x)\varepsilon$
+with $\varepsilon \sim G(\cdot)$ independent of $x$:
+\begin{enumerate}[label=(\alph*)]
+  \item \textbf{Fixed $h$:}
+    $h_{\mathrm{eff}}(x) = h/\sigma(x)$ varies with $x$.
+    The CDF estimate in standardized scale is
+    $\hat{G}_{h/\sigma(x)}(z)$, which depends on $x$ through
+    $\sigma(x)$. The score distribution $F_{s|x}$ is $x$-dependent.
+  \item \textbf{Adaptive $h(x) = c\,\sigma(x)$:}
+    $h_{\mathrm{eff}}(x) = c$ (constant). The CDF estimate becomes
+    \begin{equation}
+    \label{eq:G-hat-c}
+      \hat{F}(y \mid x) = \sum_i c_i(x)\left[
+        \frac{1}{r}\sum_j \Psi\!\left(\frac{z - Z_{ij}}{c}\right)
+      \right] \approx \hat{G}_c(z),
+    \end{equation}
+    a common kernel-smoothed estimate of $G(z)$ with bandwidth $c$,
+    independent of $x$. Consequently, the score
+    $s(x,Y) = |\hat{G}_c(Z) - 0.5|$ has an $x$-independent distribution.
+\end{enumerate}
+\end{proposition}
+
+\paragraph{Intuition.}
+Adaptive bandwidth ``standardizes'' the smoothing: every $x$ sees the
+same effective resolution $c$ when measured in units of the local noise.
+The CDF bias $\hat{G}_c(z) - G(z)$ is a function of $c$ and $G$ only,
+not of $x$.
+
+\begin{proof}[Proof sketch]
+Under $h(x) = c\,\sigma(x)$, the argument of $\Psi$ becomes
+$(z - Z_{ij})/c$ as shown above. Since $Z_{ij} \sim G(\cdot)$
+independently of $x$, the site-averaged indicator
+$\frac{1}{r}\sum_j \Psi((z - Z_{ij})/c)$ is a kernel density estimate
+of $G$ at $z$ with bandwidth $c$, using i.i.d.\ samples from $G$.
+The dependence on $x$ enters only through $c_i(x)$, which are kernel
+regression weights satisfying $\sum_i c_i(x) \approx 1$. Under
+standard kernel regression consistency conditions,
+$\hat{F}(y|x) \to \hat{G}_c(z)$ as $n \to \infty$, where
+$\hat{G}_c$ is the pooled kernel-smoothed CDF of $G$.
+\end{proof}
+
+\begin{remark}[Why CDF-first is essential]
+\label{rem:cdf-first}
+Quantile-first scores such as
+$s(x,y) = \max(\hat{q}_{\mathrm{lo}}(x) - y, y - \hat{q}_{\mathrm{hi}}(x))$
+do not have PIT structure. Even if the quantile estimator has
+$x$-homogeneous bias, the score distribution depends on the local
+noise scale through the $y$-space comparison. CDF-first scores, by
+operating in probability space $[0,1]$, automatically inherit the
+standardization that makes homogeneity possible.
+\end{remark}
+
+
+% ------------------------------------------------------------------
+\subsection{Over-Smoothed Collapse}
+\label{sec:oversmooth}
+% ------------------------------------------------------------------
+
+Score homogeneity alone is insufficient: trivially setting $h \to \infty$
+also makes $\hat{F}(y|x)$ independent of $x$ (all CDFs flatten to
+$1/2$), but the resulting CP intervals are useless.
+
+\begin{proposition}[Over-smoothed collapse]
+\label{prop:oversmooth}
+In the regime $h \to \infty$ (equivalently, fixed $h$ with
+$\sigma(x) \ll h$ for all $x$), the abs-median CP interval collapses
+to a global constant width:
+\begin{equation}
+\label{eq:collapsed-width}
+  W(x) = U(x) - L(x) \;\to\;
+  2\,Q_{1-\alpha}\bigl(\{|Y_j - \hat{f}(X_j)|\}_{j=1}^{n_{\mathrm{cal}}}\bigr)
+  \quad \text{for all } x,
+\end{equation}
+where $Q_{1-\alpha}$ denotes the $(1-\alpha)$-quantile of the
+calibration residuals.
+\end{proposition}
+
+\begin{proof}[Proof sketch]
+The logistic CDF admits the Taylor expansion
+$\Psi(u) \approx \frac{1}{2} + \frac{u}{4}$ for $|u| \ll 1$.
+When $h$ is large, $u = (y - Y_{ij})/h$ is small, so:
+\[
+  \hat{F}(y \mid x)
+  \approx \sum_i c_i(x)\!\left[\frac{1}{2}
+    + \frac{y - \bar{Y}_i}{4h}\right]
+  = \frac{1}{2} + \frac{y - \hat{f}(x)}{4h},
+\]
+where $\hat{f}(x) = \sum_i c_i(x)\bar{Y}_i$ is the kernel regression
+estimate. The abs-median score becomes:
+\[
+  s(x, y) = \left|\hat{F}(y|x) - \frac{1}{2}\right|
+  = \frac{|y - \hat{f}(x)|}{4h}.
+\]
+The CP threshold $\hat{q}$ is the $(1-\alpha)$-quantile of
+$\{|Y_j - \hat{f}(X_j)|/(4h)\}$. The prediction interval
+$\{y : s(x,y) \le \hat{q}\}$ requires
+$|y - \hat{f}(x)|/(4h) \le \hat{q}$, giving:
+\[
+  L(x) = \hat{f}(x) - 4h\hat{q}, \qquad
+  U(x) = \hat{f}(x) + 4h\hat{q}.
+\]
+The width $U(x) - L(x) = 8h\hat{q}$. But
+$\hat{q} = Q_{1-\alpha}(|Y_j - \hat{f}(X_j)|)/(4h)$, so
+$8h\hat{q} = 2\,Q_{1-\alpha}(|Y_j - \hat{f}(X_j)|)$.
+The factor $h$ cancels exactly, and the width depends only on the
+marginal distribution of calibration residuals.
+\end{proof}
+
+\begin{remark}[Width floor and coverage distortion]
+\label{rem:width-distortion}
+The collapsed width
+$W^* = 2\,Q_{1-\alpha}(|\sigma(X)\varepsilon|)$ depends on the
+\emph{marginal} distribution of $\sigma(X)$, not the local
+$\sigma(x)$:
+\begin{itemize}
+  \item Where $\sigma(x) \ll E[\sigma(X)]$: the interval is vastly
+    too wide $\to$ severe over-coverage (wasted precision).
+  \item Where $\sigma(x) \gg E[\sigma(X)]$: the interval is too narrow
+    $\to$ under-coverage.
+\end{itemize}
+\end{remark}
+
+\begin{remark}[Numerical example: \texttt{exp2}]
+\label{rem:exp2-collapse}
+For \texttt{exp2}: $\sigma(x) = \sqrt{0.01 + 0.2(x-\pi)^2}$,
+$x \in [0, 2\pi]$, $\alpha = 0.1$.
+\begin{itemize}
+  \item At $x = \pi$: $\sigma(\pi) = 0.1$, oracle 90\% interval width
+    $\approx 2 \times 1.645 \times 0.1 = 0.33$.
+  \item At $x = 0$: $\sigma(0) \approx 2.0$, oracle width
+    $\approx 6.53$.
+  \item Collapsed width:
+    $W^* = 2\,Q_{0.9}(|\sigma(X)\varepsilon|) \approx 2.95$ (computed
+    from the marginal residual distribution with $X \sim \mathrm{Uniform}[0,2\pi]$).
+  \item At $x = \pi$: $W^*/W_{\mathrm{oracle}} \approx 9.0$
+    ($9\times$ too wide).
+  \item At $x = 0$: $W^*/W_{\mathrm{oracle}} \approx 0.45$
+    ($55\%$ under-coverage risk).
+\end{itemize}
+\end{remark}
+
+% ------------------------------------------------------------------
+\subsection{The Two Conditions for Useful Homogeneity}
+\label{sec:two-conditions}
+% ------------------------------------------------------------------
+
+The over-smoothed collapse shows that score homogeneity is
+\emph{necessary but not sufficient}. Two conditions are needed
+simultaneously:
+
+\begin{enumerate}
+  \item \textbf{Score homogeneity:}
+    $d_{\mathrm{TV}}(F_{s|x}, F_{s|x'}) \approx 0$ for all $x, x'$.
+    This ensures a single $\hat{q}$ works uniformly.
+  \item \textbf{Local adaptivity:}
+    The interval width $W(x)$ reflects local $\sigma(x)$.
+    This ensures the interval is not trivially constant.
+\end{enumerate}
+
+Adaptive bandwidth $h(x) = c\,\sigma(x)$ with moderate $c$ achieves
+both: the CDF is smoothed uniformly in standardized scale (condition~1),
+but the smoothing preserves the $\sigma(x)$-dependence of the
+quantiles because the CDF estimate still distinguishes different
+$\sigma(x)$ through the $y$-to-$z$ transformation (condition~2).
+
+Fixed $h$ with $h \to \infty$ achieves condition~1 only, violating
+condition~2 (Proposition~\ref{prop:oversmooth}).
+Fixed $h$ with $h \to 0$ achieves condition~2 only (sharp CDF,
+locally adaptive width), but the score distribution is
+$x$-dependent, violating condition~1.
+
+% ------------------------------------------------------------------
+\subsection{Connection to CP$^2$ Framework}
+\label{sec:cp2}
+% ------------------------------------------------------------------
+
+Our score homogeneity result connects to the conditional conformal
+prediction literature through the total variation framework
+\cite{Barber2023}. Under approximate exchangeability, the conditional
+coverage satisfies
+\begin{equation}
+\label{eq:cp2-bound}
+  P(Y \in C(x) \mid X = x) \ge 1 - \alpha
+  - d_{\mathrm{TV}}(x) - p_{n+1}(x),
+\end{equation}
+where $d_{\mathrm{TV}}(x)$ measures the discrepancy between the
+conditional and marginal score distributions and $p_{n+1}(x)$ is an
+exchangeability correction. The CP$^2$ framework \cite{CP2} provides
+RKHS-based bounds on a similar coverage gap.
+
+\paragraph{When $d_{\mathrm{TV}}(x) = \delta$ (constant).}
+The bound becomes $P(Y \in C(x) \mid X=x) \ge 1 - \alpha - \delta
+- p_{n+1}$, a \emph{uniform} bound independent of $x$.
+
+\paragraph{Our contribution.}
+CP$^2$ does not identify when $d_{\mathrm{TV}}(x)$ is $x$-independent.
+We provide a concrete sufficient condition:
+
+\begin{lemma}[Adaptive $h$ implies uniform $d_{\mathrm{TV}}$]
+\label{lem:uniform-dtv}
+Under the location-scale model with
+$h(x) = c\,\sigma(x)$, the CDF-based conformal score distribution
+satisfies $d_{\mathrm{TV}}(F_{s|x}, F_{s|x'}) \to 0$ for all
+$x, x'$ as $n \to \infty$. Hence $d_{\mathrm{TV}}(x)$ (relative to
+the pooled score distribution) is asymptotically constant in $x$.
+\end{lemma}
+
+\paragraph{Important subtlety.}
+Uniform $d_{\mathrm{TV}}$ alone is not sufficient (Section~\ref{sec:oversmooth}).
+The combination of small constant $d_{\mathrm{TV}}$ \emph{and} locally
+adaptive intervals requires the bandwidth to be proportional to
+$\sigma(x)$, not merely large.
+
+% ------------------------------------------------------------------
+% Promoted to top-level section so it reads as the main theorem section
+\section{Coverage Bound and Rate Analysis}
+\label{sec:error-comparison}
+% ------------------------------------------------------------------
+
+RCP (Rectified Conformal Prediction) \cite{RCP} and our CKME-based
+approach both aim to reduce the $x$-dependence of conformal score
+distributions, but they operate on fundamentally different error
+decompositions. We make this distinction precise.
+
+\paragraph{RCP's error structure.}
+RCP's strategy is to transform the conformal score via a rectification
+map $s \mapsto \tilde{s} = T(s, x)$ so that the transformed score's
+conditional $\alpha$-quantile $\tau(x) :=
+Q_\alpha(\tilde{s} \mid X = x)$ becomes $x$-independent.
+In practice, $\tau(x)$ is unknown and must be estimated. Let
+$\hat\tau(x)$ denote the estimated conditional quantile (obtained,
+e.g., via local quantile regression with kernel bandwidth $b$).
+RCP's conditional coverage theorem \cite{RCP} shows that the
+coverage gap is controlled by
+\begin{equation}
+\label{eq:rcp-error}
+  \bigl|P(Y \in C(x) \mid X=x) - (1-\alpha)\bigr|
+  \;\lesssim\; \sup_x |\hat\tau(x) - \tau(x)|,
+\end{equation}
+i.e., the \emph{quantile-of-score estimation error}.
+This error in turn inherits the usual bias--variance trade-off of
+the local quantile regression bandwidth $b$: small $b$ yields low bias
+but high variance; large $b$ reverses the trade-off. The bandwidth $b$
+is a nuisance parameter that must be tuned, and its optimal value
+depends on the smoothness of $\tau(x)$.
+
+\paragraph{Our error structure.}
+In the CKME framework with CDF-based scores, we do not estimate a
+conditional quantile of the score. Instead, the relevant error
+decomposition is:
+\begin{equation}
+\label{eq:our-error}
+  d_{\mathrm{TV}}\bigl(F_{s|x},\; F_{s,\mathrm{pivot}}\bigr)
+  \;\le\;
+  \underbrace{\frac{\pi^2 c^2}{6}\,\|g''\|_1}_{\text{(i) smoothing bias}}
+  \;+\;
+  \underbrace{\sup_y\,|\hat F(y\mid x) - F(y\mid x)|}_{\text{(ii) CDF estimation error}},
+\end{equation}
+where term~(i) arises from the logistic smooth indicator with adaptive
+bandwidth $h(x) = c\,\sigma(x)$ (Devroye and Gy\"{o}rfi \cite{DG85}),
+and term~(ii) is the CKME regression error (which is $O_p(n^{-s})$
+for some rate $s > 0$ depending on kernel smoothness and dimension).
+
+When $\sigma(x)$ is unknown and replaced by $\hat\sigma(x)$, a third
+term appears:
+\begin{equation}
+\label{eq:plugin-error}
+  \text{(iii) plug-in error:}\quad
+  |\hat h(x) - h(x)| = c\,|\hat\sigma(x) - \sigma(x)|,
+\end{equation}
+which propagates into both terms~(i) and~(ii) through the
+bandwidth. Bounding this term quantitatively is addressed in
+Section~\ref{sec:plugin-rate}.
+
+\paragraph{Structural comparison.}
+The key difference is summarized as follows:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+  & \textbf{RCP} & \textbf{CKME (ours)} \\
+\midrule
+Core estimated object
+  & $\hat\tau(x)$: conditional quantile of score
+  & $\hat F(y \mid x)$: conditional CDF \\
+Coverage-controlling error
+  & $\sup_x |\hat\tau(x) - \tau(x)|$
+  & $d_{\mathrm{TV}}(F_{s|x}, F_{s,\mathrm{pivot}})$ \\
+Bandwidth role
+  & nuisance parameter in local QR
+  & design parameter with explicit bias formula \\
+Error decomposition
+  & QR bias--variance (implicit in $b$)
+  & smoothing bias $O(c^2)$ + CDF error $O_p(n^{-s})$ \\
+Plug-in parameter
+  & $\tau(x)$ itself
+  & $\sigma(x)$ (noise scale) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{remark}[Different ``quantile errors'']
+\label{rem:quantile-errors}
+Both frameworks involve quantile estimation, but the quantile objects
+are distinct. RCP estimates $Q_\alpha(\tilde{s} \mid X=x)$, the
+$\alpha$-quantile of the \emph{transformed score} conditional on $x$.
+CKME, when used for prediction intervals, estimates
+$Q_\tau(Y \mid X=x)$, the $\tau$-quantile of the \emph{response}
+conditional on $x$, obtained by inverting $\hat F(y \mid x)$.
+The former is an intermediate quantity for calibration; the latter is
+the final inferential target. This distinction is important: our
+quantile error enters through CDF inversion and is bounded by the
+CDF estimation error via $|Q_\tau - \hat Q_\tau| \le \|\hat F - F\|_\infty / f(Q_\tau \mid x)$,
+whereas RCP's quantile error is a direct estimation problem in its own
+right.
+\end{remark}
+
+\paragraph{Implications for bandwidth selection.}
+In RCP, the bandwidth $b$ of the local quantile regression is a
+nuisance parameter: it controls the estimation quality of $\hat\tau(x)$
+but has no structural role in the score distribution itself.
+In our framework, the bandwidth $c$ of the smooth indicator plays a
+dual role: it is both an estimation parameter (controlling CDF
+smoothing bias) and a \emph{design} parameter (controlling score
+homogeneity). The explicit decomposition~\eqref{eq:our-error}
+makes this dual role transparent and provides a principled basis for
+selecting $c$, which has no direct analogue in the RCP framework.
+
+\paragraph{Two-sided conditional coverage bound.}
+A structural advantage of the $d_{\mathrm{TV}}$ framework is that it
+yields a \emph{two-sided} bound on conditional coverage. Since total
+variation controls discrepancy in both directions, we obtain:
+
+\begin{theorem}[Two-sided conditional coverage bound]
+\label{prop:two-sided}% label kept for back-compat; cite as Theorem~\ref{prop:two-sided}
+Let $\hat{q}$ be the split-conformal calibration quantile computed
+from $n$ calibration scores. Suppose
+$d_{\mathrm{TV}}(F_{s|x}, F_{s,\mathrm{pool}}) \le \delta(c, n)$
+for all $x$, where $F_{s,\mathrm{pool}}$ is the marginal (pooled)
+score distribution. Then
+\begin{equation}
+\label{eq:two-sided}
+  \bigl|P(Y \in C(x) \mid X = x) - (1 - \alpha)\bigr|
+  \;\le\; \delta(c, n) + p_{n+1},
+\end{equation}
+where $p_{n+1} = O(1/n)$ is the finite-sample calibration correction.
+Under the adaptive bandwidth $h(x) = c\,\sigma(x)$ with the
+location-scale model, the bound~\eqref{eq:our-error} gives
+\[
+  \delta(c, n) \;\le\;
+  \frac{\pi^2 c^2}{6}\,\|g''\|_1 + O_p(n^{-s}).
+\]
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By definition of $d_{\mathrm{TV}}$,
+$|P(s \le \hat{q} \mid X=x) - P(s \le \hat{q})| \le
+d_{\mathrm{TV}}(F_{s|x}, F_{s,\mathrm{pool}})$.
+Standard split-conformal calibration gives
+$|P(s \le \hat{q}) - (1 - \alpha)| \le p_{n+1}$.
+The triangle inequality yields~\eqref{eq:two-sided}.
+The bound on $\delta(c,n)$ follows from~\eqref{eq:our-error}.
+\end{proof}
+
+\begin{remark}[Two-sided vs.\ one-sided bounds]
+\label{rem:two-sided}
+RCP's coverage theorem is essentially one-sided: it guarantees that
+conditional coverage does not fall too far below $1 - \alpha$
+(a safety guarantee), but does not directly control over-coverage.
+Proposition~\ref{prop:two-sided} controls both directions:
+\begin{itemize}
+  \item The \textbf{lower bound} ensures safety (no severe
+    under-coverage at any $x$).
+  \item The \textbf{upper bound} ensures efficiency (no severe
+    over-coverage, which would imply unnecessarily wide intervals
+    at some $x$).
+\end{itemize}
+Together, they assert that conditional coverage is approximately
+$1 - \alpha$ \emph{uniformly} over $x$ --- a near-conditional-validity
+statement. This two-sided nature is a direct consequence of using
+$d_{\mathrm{TV}}$ (an absolute discrepancy) rather than a one-sided
+quantile perturbation argument.
+
+The absolute-value form~\eqref{eq:two-sided} also corresponds
+directly to the experimental metric \texttt{cov\_gap\_sup}
+$= \sup_x |\text{coverage}(x) - (1-\alpha)|$ reported in the
+empirical results, making the theory--experiment connection
+transparent.
+\end{remark}
+
+\subsection{Plug-in Bandwidth for the Noise Scale}
+\label{sec:plugin-rate}
+
+The theoretical adaptive rule $h(x) = c\,\sigma(x)$ requires the
+unknown noise scale $\sigma(x)$. In practice we replace it by a
+plug-in estimator $\hat\sigma(x)$, which introduces a third error
+component, $|\hat h(x) - h(x)| = c\,|\hat\sigma(x)-\sigma(x)|$, that
+was left unquantified in~\eqref{eq:plugin-error}. Here we derive
+its rate when $\hat\sigma$ is built from replicated Stage-1 data.
+
+\paragraph{Two-step construction of $\hat\sigma$.}
+Assume the Stage-1 budget consists of $n_0$ sites
+$X_1,\dots,X_{n_0} \sim p_X$, each with $r_0 \ge 2$ replications
+$Y_{i,1},\dots,Y_{i,r_0}$. Form the site-wise sample standard
+deviation
+\[
+\tilde\sigma_i
+  \;=\; \sqrt{\tfrac{1}{r_0 - 1}\,\textstyle\sum_{j=1}^{r_0}
+                    (Y_{i,j} - \bar Y_i)^2},
+\qquad
+\bar Y_i = \tfrac{1}{r_0}\sum_j Y_{i,j},
+\]
+and smooth across $X$ via a Nadaraya--Watson estimator with kernel
+$K$ and bandwidth $h_\sigma$:
+\begin{equation}\label{eq:nw-sigma}
+\hat\sigma_{h_\sigma}(x)
+  \;=\;
+  \frac{\sum_{i=1}^{n_0} K_{h_\sigma}(x - X_i)\,\tilde\sigma_i}
+       {\sum_{i=1}^{n_0} K_{h_\sigma}(x - X_i)}.
+\end{equation}
+Under $Y = f(x) + \sigma(x)\varepsilon$ with
+$\mathbb{E}[\varepsilon]=0$, $\mathrm{Var}(\varepsilon)=1$, a
+standard delta-method expansion gives
+\[
+\mathbb{E}[\tilde\sigma_i \mid X_i] = \sigma(X_i) + O(r_0^{-1}),
+\quad
+\mathrm{Var}(\tilde\sigma_i \mid X_i)
+   = \frac{\sigma^2(X_i)\,(\kappa_4 - 1)}{4(r_0-1)} + O(r_0^{-2}),
+\]
+where $\kappa_4 = \mathbb{E}[\varepsilon^4]$.
+
+\paragraph{Bias--variance decomposition.}
+Under the usual NW assumptions (twice-differentiable $\sigma$ and
+$p_X$, $p_X(x)>0$, symmetric kernel $K$ with $\mu_2(K)=\int u^2
+K(u)\,du$, $R(K) = \int K^2$), the pointwise bias and variance of
+$\hat\sigma_{h_\sigma}$ satisfy, as $n_0\to\infty$, $h_\sigma\to
+0$, $n_0 h_\sigma \to \infty$:
+\begin{equation}\label{eq:sigma-bias}
+\boxed{\;
+\mathrm{Bias}\bigl[\hat\sigma_{h_\sigma}(x)\bigr]
+  \;=\; \tfrac{1}{2}\,h_\sigma^{2}\,\mu_2(K)\!
+        \left[\sigma''(x) + 2\,\frac{\sigma'(x)\,p_X'(x)}{p_X(x)}\right]
+       + o(h_\sigma^{2}) + O(r_0^{-1}).
+\;}
+\end{equation}
+\begin{equation}\label{eq:sigma-var}
+\boxed{\;
+\mathrm{Var}\bigl[\hat\sigma_{h_\sigma}(x)\bigr]
+  \;=\;
+  \frac{R(K)\,\sigma^{2}(x)\,(\kappa_4 - 1)}
+       {4\,(r_0-1)\,n_0\,h_\sigma\,p_X(x)}
+  \;+\; o\bigl((n_0 h_\sigma r_0)^{-1}\bigr).
+\;}
+\end{equation}
+Two features distinguish~\eqref{eq:sigma-var} from a vanilla NW
+variance: (i) the $(r_0-1)^{-1}$ factor reflects the within-site
+replication, so doubling $r_0$ halves the variance contribution;
+(ii) the kurtosis factor $\kappa_4-1$ makes the variance sensitive
+to heavy-tailed noise (e.g. the Gamma or Student-$t$ designs).
+
+\paragraph{Optimal bandwidth and MSE rate.}
+The pointwise MSE takes the canonical form
+$\mathrm{MSE}(x) = C_1(x)\,h_\sigma^{4}
+                    + C_2(x)/(n_0 h_\sigma r_0)$,
+and minimising over $h_\sigma$ yields
+\begin{equation}\label{eq:hsigma-optimal}
+\boxed{\;
+h_\sigma^{\star}(x)
+   \;\propto\; (n_0\,r_0)^{-1/5},
+\qquad
+\mathrm{MSE}^{\star}(x)
+   \;\propto\; (n_0\,r_0)^{-4/5}.
+\;}
+\end{equation}
+Crucially, the \emph{effective sample size} is $n_0 r_0$, not just
+$n_0$: each replicate sharpens $\tilde\sigma_i$ and propagates
+through the smoother. Thus under a fixed total budget
+$N = n_0 r_0$, the rate of $\hat\sigma$ depends only on $N$, while
+Stage-1 CKME fitting depends on $n_0$ alone --- these two
+considerations pull $(n_0,r_0)$ in opposite directions.
+
+\paragraph{Propagating $\hat\sigma$ into the coverage bound.}
+Plugging~\eqref{eq:nw-sigma} into the adaptive bandwidth rule
+$\hat h(x) = c\,\hat\sigma(x)$ and tracking the perturbation
+through the score density $g$ in~\eqref{eq:our-error}, a first-order
+expansion yields an updated form of the coverage bound of
+Proposition~\ref{prop:two-sided}:
+\begin{equation}\label{eq:two-sided-plugin}
+\bigl|\mathbb{P}(Y\in C(x)\mid X=x) - (1-\alpha)\bigr|
+  \;\le\;
+  \underbrace{\tfrac{\pi^2 c^{2}}{6}\,\|g''\|_{1}}_{\text{smoothing}}
+  \;+\; \underbrace{\|\widehat F - F\|_{\infty}}_{\text{CKME fit}}
+  \;+\; \underbrace{c\,\|g'\|_{\infty}\,
+        (n_0 r_0)^{-2/5}}_{\text{plug-in $\hat\sigma$}}
+  \;+\; p_{n+1}.
+\end{equation}
+The plug-in term inherits the MSE $^{1/2}$ rate
+$(n_0 r_0)^{-2/5}$ from~\eqref{eq:hsigma-optimal} and enters
+linearly in $c$: larger $c$ not only amplifies the smoothing bias
+but also the plug-in bias.
+
+\paragraph{Implication: the optimal $c$ shrinks under plug-in.}
+Let $c_{\text{or}}^{\star}$ minimise the oracle bound
+$\tfrac{\pi^2 c^{2}}{6}\|g''\|_{1} + \|\widehat F - F\|_{\infty}$
+and $c_{\text{pi}}^{\star}$ minimise~\eqref{eq:two-sided-plugin}.
+Ignoring the constant CKME term, differentiating in $c$ gives
+\[
+c_{\text{pi}}^{\star}
+  \;\approx\;
+  c_{\text{or}}^{\star}
+  \;-\;
+  \frac{3\,\|g'\|_{\infty}}{\pi^{2}\,\|g''\|_{1}}
+         \,(n_0 r_0)^{-2/5},
+\]
+so the plug-in optimum is \emph{smaller} than the oracle one, with
+a gap that closes at rate $(n_0 r_0)^{-2/5}$. This matches the
+empirical observation in the plug-in variant of the homogeneity
+experiment, where the best $c$ on the $c$-scan shifts leftwards
+relative to the oracle curve, and the gap narrows as we enlarge
+$r_0$.
+
+\subsection{Bandwidth Rate for the CKME Indicator}
+\label{sec:h-rate}
+
+Proposition~\ref{prop:two-sided} bounds the coverage deviation by
+$\tfrac{\pi^{2} c^{2}}{6}\|g''\|_{1} + \|\widehat F - F\|_{\infty}$,
+where the first term is a \emph{bias} contribution from
+$h(x) = c\,\sigma(x)$ smoothing the score density $g$, while the
+second bundles the entire CKME estimation error. Hidden inside
+$\|\widehat F - F\|_{\infty}$ is a second, symmetric bias--variance
+trade-off in the bandwidth $h$ itself, which we unpack here.
+
+\paragraph{Bias and variance of $\widehat F(y|x)$.}
+With a smooth indicator $\psi_{h}(y - t) \approx \mathbf{1}\{y \le t\}$
+of bandwidth $h$, the CKME CDF estimator
+$\widehat F(y|x) = \sum_i c_i(x)\,\psi_{h}(y - Y_i)$ admits the
+pointwise decomposition
+\begin{equation}\label{eq:F-bias}
+\boxed{\;
+\mathbb{E}[\widehat F(y|x)] - F(y|x)
+  \;=\;
+  \tfrac{1}{2}\,h^{2}\,\mu_{2}(\psi)\,f_{Y|X}'(y|x)
+  \;+\; \underbrace{O\!\bigl(\ell_{x}^{2}\bigr)}_{\text{NW bias in }x}
+  \;+\; o(h^{2}),
+\;}
+\end{equation}
+\begin{equation}\label{eq:F-var}
+\boxed{\;
+\mathrm{Var}[\widehat F(y|x)]
+  \;=\;
+  \frac{F(y|x)(1 - F(y|x))}{n_0\,r_0\,p_X(x)\,\ell_{x}}
+  \;+\; O\!\bigl(h^{-1}/(n_0 r_0)\bigr)
+  \;+\; o(\cdot).
+\;}
+\end{equation}
+Here $\mu_{2}(\psi) = \int u^{2}\psi'(u)\,du$ plays the role of the
+second moment of the induced kernel
+$\psi_{h}' = h^{-1}\psi'(\cdot/h)$. Equation~\eqref{eq:F-bias}
+says $h$ acts on the CDF exactly as a kernel smoother on $F$, and
+its bias is driven by the \emph{score density slope}
+$f_{Y|X}'(y|x) = \partial_{y} f_{Y|X}(y|x)$.
+
+\paragraph{Rate for $h^{\star}$.}
+Balancing the $h^{4}$ bias² in~\eqref{eq:F-bias} against the
+$h^{-1}/(n_0 r_0)$ variance contribution gives the classical
+Nadaraya--Watson rate
+\begin{equation}\label{eq:h-optimal}
+\boxed{\;
+h^{\star}\;\propto\;(n_0\,r_0)^{-1/5},
+\qquad
+\bigl\|\widehat F - F\bigr\|_{\infty}^{\star}\;\propto\;(n_0\,r_0)^{-2/5}.
+\;}
+\end{equation}
+Note the \emph{same} effective sample size $n_0 r_0$ as for
+$\hat\sigma$ in~\eqref{eq:hsigma-optimal}: replications help
+$\widehat F$ too, because each $Y_{i,j}$ contributes an independent
+vote to the indicator average. This is why the replicated two-stage
+design $(n_0, r_0)$ with $r_0 \ge 2$ dominates a single-shot design
+of the same total $N = n_0 r_0$ in the tail-quantile regime (where
+variance dominates).
+
+\paragraph{Combining with the coverage bound.}
+Substituting~\eqref{eq:h-optimal} into the coverage decomposition
+and collecting terms, Proposition~\ref{prop:two-sided} sharpens to
+\begin{equation}\label{eq:two-sided-full}
+\bigl|\mathbb{P}(Y\in C(x)\mid X=x) - (1-\alpha)\bigr|
+  \;\lesssim\;
+  \underbrace{\tfrac{\pi^{2} c^{2}}{6}\|g''\|_{1}}_{\text{$c$-smoothing}}
+  \;+\; \underbrace{(n_0 r_0)^{-2/5}}_{\text{$h$ trade-off}}
+  \;+\; \underbrace{c\,(n_0 r_0)^{-2/5}\|g'\|_{\infty}}_{\text{$\hat\sigma$ plug-in}}
+  \;+\; p_{n+1}.
+\end{equation}
+Three distinct bias--variance mechanisms are visible:
+(i) the homogeneity term driven by $c$, which \emph{cannot} be
+driven to zero at finite $n$ because $c\to 0$ sends the adaptive
+mechanism off; (ii) the CKME bandwidth $h$ term, which vanishes at
+rate $(n_0 r_0)^{-2/5}$; and (iii) the plug-in $\hat\sigma$ term,
+also at $(n_0 r_0)^{-2/5}$ but scaled by $c$.
+
+\begin{remark}[Why high-$\tau$ quantiles do not converge at fixed $h$]
+\label{rem:tail-nonconvergence}
+Inverting~\eqref{eq:F-bias} gives
+$\hat q_{\tau}(x) - q_{\tau}(x) \approx
+    -\tfrac{1}{2} h^{2}\mu_{2}(\psi)\,
+        f_{Y|X}'(q_{\tau}|x) / f_{Y|X}(q_{\tau}|x)$,
+so the quantile bias is amplified by the reciprocal tail density
+$1/f_{Y|X}(q_{\tau}|x)$. When $\tau\to 1$ this factor diverges for
+any distribution with a density tail, so \emph{fixing} $h$ (no
+matter how small) leaves a floor in $\sup_{x}|\hat q_{\tau}-q_{\tau}|$
+that does not vanish as $n\to\infty$. Only $h\to 0$ at the rate
+prescribed by~\eqref{eq:h-optimal} restores convergence, and even
+then only if $h^{2}/f_{Y|X}(q_{\tau}|x)\to 0$ ---
+a $\tau$-dependent condition. This matches the empirical finding
+in \texttt{exp\_onesided/exp2\_sup\_vs\_tau.py}, where
+$\sup_{x}|\hat q_{\tau}-q_{\tau}|$ decays with $n$ for
+$\tau\in\{0.5,0.6,0.7\}$ but stalls for
+$\tau\in\{0.8,0.9,0.95\}$ under the project's default fixed $h$.
+\end{remark}
+
+\paragraph{Summary: three U-shapes, one budget.}
+Equation~\eqref{eq:two-sided-full} predicts \emph{three}
+bias--variance U-shapes along the CKME pipeline: one in the CKME
+bandwidth $h$, one in the adaptive coefficient $c$, and one in the
+plug-in smoother bandwidth $h_{\sigma}$. All three are confirmed
+empirically in Figure~\ref{fig:three-u-shapes}: panel (a) varies
+$h$ at fixed $(c,\hat\sigma)$ and shows quantile error as a
+function of $h$ across multiple $\tau$ levels; panel (b) varies
+$c$ in $h(x)=c\,\hat\sigma(x)$ and reports the resulting
+quantile and coverage errors; panel (c) varies the plug-in
+smoother bandwidth $h_{\sigma}$ and reports RMSE of $\hat\sigma$,
+KS-max of the score, and the sup coverage gap. All three share
+the effective sample size $n_0 r_0$, so budget allocation ---
+not just parameter tuning --- becomes the correct lens: the
+marginal return of one more replication equals that of one more
+site whenever variance dominates at that position on the U-curve.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=0.62\textwidth]{../exp_h_sweep/output_exp2/fig3_qerror_vs_h.png}\\[2pt]
+{\small (a) CKME indicator bandwidth $h$ (exp2): quantile error
+\(|\hat q_{\tau}-q_{\tau}|\) vs.\ $h$ across $\tau$.}\\[3pt]
+\includegraphics[width=0.62\textwidth]{../exp_conditional_coverage/diagnostics/output/diag3_cscan.png}\\[2pt]
+{\small (b) Adaptive coefficient $c$: quantile and coverage errors
+vs.\ $c$ in $h(x)=c\,\hat\sigma(x)$.}\\[3pt]
+\includegraphics[width=0.62\textwidth]{../exp_score_homogeneity_plugin/output/figD_hsigma_scan.png}\\[2pt]
+{\small (c) Plug-in smoother bandwidth $h_{\sigma}$: RMSE of
+$\hat\sigma$, KS-max, and sup coverage gap vs.\ $h_{\sigma}$ for
+three simulators.}
+\caption{\textbf{Three bias--variance U-shapes along the CKME
+pipeline.} Each panel isolates one bandwidth while holding the
+others fixed. The left branch of every U is variance-dominated and
+the right branch is bias-dominated, consistent with
+Equations~\eqref{eq:F-bias}--\eqref{eq:F-var},
+\eqref{eq:two-sided-full} and \eqref{eq:sigma-bias}--\eqref{eq:sigma-var}.}
+\label{fig:three-u-shapes}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsection{Generalization Beyond Gaussian Noise}
+\label{sec:beyond-gaussian}
+% ------------------------------------------------------------------
+
+The effective-bandwidth argument (Section~\ref{sec:h-eff}) uses only the
+location-scale structure $Y = f(x) + \sigma(x)\varepsilon$, not the
+specific form of $G$. The key algebraic step
+\[
+  \frac{y - Y_{ij}}{h(x)} = \frac{z - Z_{ij}}{c}
+\]
+holds regardless of whether $\varepsilon$ is Gaussian, Student-$t$,
+centered Gamma, or any other distribution with $E[\varepsilon] = 0$,
+$\mathrm{Var}(\varepsilon) = 1$.
+
+Therefore:
+\begin{itemize}
+  \item Proposition~\ref{prop:homogeneity} applies to all
+    location-scale families.
+  \item The proof requires only that $G$ has a bounded density (for
+    kernel smoothing consistency), not that $G$ is Gaussian.
+  \item Beyond location-scale (e.g., shape parameter varying with $x$),
+    the standardization argument breaks. However, experiments show
+    approximate homogeneity is preserved for moderate violations
+    (Section~\ref{sec:exp-design}).
+\end{itemize}
+
+
+%% ====================================================================
+\section{Empirical Validation}
+\label{sec:exp-design}
+%% ====================================================================
+
+\subsection{Objective}
+
+The experiment tests three theoretical predictions:
+\begin{enumerate}
+  \item Adaptive $h(x) = c\,\sigma(x)$ produces lower KS distance
+    between local and pooled score distributions (score homogeneity).
+  \item Score homogeneity, not estimation accuracy, determines
+    conditional coverage gap (decoupling).
+  \item The mechanism holds for non-Gaussian location-scale families
+    (generality).
+\end{enumerate}
+
+\subsection{Three-Phase Design}
+
+We use three simulators with increasing difficulty, all sharing the
+true function $f(x) = e^{x/10}\sin(x)$ on $x \in [0, 2\pi]$:
+
+\begin{center}
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{Phase} & \textbf{Simulator} & \textbf{$\sigma(x)$ profile} &
+  \textbf{Purpose} \\
+\midrule
+1 & \texttt{mild} &
+  $0.3(1 + 0.5\sin x)$, ratio $\approx 3\times$ &
+  Clean theory verification \\
+2 & \texttt{exp2} &
+  $\sqrt{0.01 + 0.2(x-\pi)^2}$, ratio $\approx 200\times$ &
+  Finite-sample stress test \\
+3 & \texttt{nongauss\_B2L} &
+  $\sigma_{\mathrm{tar}}(x) = 0.1 + 0.1(x-\pi)^2$, Gamma($k$=2) &
+  Non-Gaussian robustness \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Why three phases?}
+Phase~1 (mild) has a small $\sigma$-ratio, so finite-sample noise is
+small and the effective-bandwidth mechanism can be verified cleanly.
+Phase~2 (exp2) has a $\sigma$-ratio of $\sim$200$\times$, stressing the
+mechanism where $\sigma(x) \to 0$ creates near-degenerate CDF
+estimates. Phase~3 (nongauss\_B2L) uses centered Gamma noise ($k=2$,
+strong skew), testing whether the location-scale argument extends to
+non-Gaussian settings.
+
+\subsection{Bandwidth Configurations}
+
+Nine bandwidth configurations per simulator:
+\begin{itemize}
+  \item \textbf{3 fixed:} $h = 0.05$ (small), $h_{\mathrm{cv}}$
+    (cross-validated), $h = 0.5$ (large).
+  \item \textbf{6 adaptive:} $h(x) = c\,\sigma(x)$ with oracle
+    $\sigma(x)$, $c \in \{0.5, 1.0, 1.5, 2.0, 3.0, 5.0\}$.
+\end{itemize}
+
+All configurations share the same $(e\kern-0.5pt\ell_x, \lambda)$
+hyperparameters (cross-validated jointly), isolating the bandwidth
+effect.
+
+\subsection{Budget and Evaluation}
+
+\begin{itemize}
+  \item \textbf{Stage~1:} $n_0 = 512$ sites, $r_0 = 1$ replication
+    each. Stage~2: $n_1 = 512$, $r_1 = 1$.
+  \item \textbf{Evaluation grid:} $M = 50$ equally-spaced points in
+    $[0, 2\pi]$.
+  \item \textbf{MC test draws:} $B = 2000$ fresh draws per eval point
+    per macrorep for conditional coverage and score ECDF.
+  \item \textbf{Macroreplications:} $n_{\mathrm{macro}} = 20$
+    (5 completed for current results).
+\end{itemize}
+
+\subsection{Metrics}
+
+\begin{enumerate}
+  \item \textbf{KS$_{\max}$}: $\max_{m=1}^{M}
+    \mathrm{KS}(F_{s|x_m}, F_{s,\mathrm{pooled}})$ --- score
+    homogeneity (lower = better).
+  \item \textbf{KS$_{\mathrm{mean}}$}: $\frac{1}{M}\sum_m
+    \mathrm{KS}(F_{s|x_m}, F_{s,\mathrm{pooled}})$ --- average
+    homogeneity.
+  \item \textbf{Coverage gap (sup)}:
+    $\max_m |P(Y \in C(x_m)|x_m) - (1-\alpha)|$ --- worst-case
+    conditional coverage deviation (lower = better).
+  \item \textbf{Coverage gap (MAE)}:
+    $\frac{1}{M}\sum_m |P(Y \in C(x_m)|x_m) - (1-\alpha)|$ ---
+    average coverage deviation.
+  \item \textbf{Quantile error (sup)}:
+    $\max_m \max_{\tau \in \{\alpha/2, 1-\alpha/2\}}
+    |\hat{q}_\tau(x_m) - q_\tau(x_m)|$ --- estimation accuracy
+    (not directly related to coverage under homogeneity).
+  \item \textbf{Width std}: $\mathrm{SD}_x(W(x_m))$ --- spatial
+    variation of interval width (higher = more locally adaptive).
+\end{enumerate}
+
+
+%% ====================================================================
+% NOTE-ONLY: detailed per-phase results; in paper mode, condense to key figures
+\ifpaper\else
+\section{Detailed Experiment Results}
+\label{sec:results}
+%% ====================================================================
+
+All results are mean $\pm$ SD across 5 macroreplications.
+
+\newcommand{\figdir}{../exp_score_homogeneity/output}
+
+% ------------------------------------------------------------------
+\subsection{Phase 1: Mild Heteroscedasticity}
+\label{sec:results-mild}
+% ------------------------------------------------------------------
+
+\begin{table}[h]
+\centering
+\small
+\caption{Phase~1 (\texttt{mild}): selected bandwidth configurations.}
+\label{tab:mild}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Bandwidth} & \textbf{KS$_{\max}$} & \textbf{KS$_{\mathrm{mean}}$}
+  & \textbf{Cov gap (sup)} & \textbf{Cov gap (MAE)} & \textbf{$q$-err (sup)} \\
+\midrule
+fixed\_small & $0.236 \pm 0.028$ & $0.089 \pm 0.014$ & $0.105 \pm 0.042$
+  & $0.039 \pm 0.005$ & $1.83 \pm 0.08$ \\
+fixed\_cv    & $0.189 \pm 0.004$ & $0.114 \pm 0.010$ & $0.115 \pm 0.028$
+  & $0.064 \pm 0.010$ & $1.83 \pm 0.08$ \\
+fixed\_large & $0.267 \pm 0.007$ & $0.147 \pm 0.003$ & $0.131 \pm 0.011$
+  & $0.075 \pm 0.005$ & $1.83 \pm 0.08$ \\
+\midrule
+adaptive $c\!=\!0.5$ & $0.142 \pm 0.034$ & $0.050 \pm 0.008$ & $0.063 \pm 0.008$
+  & $0.023 \pm 0.003$ & $1.83 \pm 0.08$ \\
+adaptive $c\!=\!1.0$ & $0.081 \pm 0.011$ & $0.031 \pm 0.004$ & $0.047 \pm 0.008$
+  & $0.013 \pm 0.002$ & $1.83 \pm 0.08$ \\
+adaptive $c\!=\!1.5$ & $\mathbf{0.065 \pm 0.019}$ & $\mathbf{0.025 \pm 0.002}$
+  & $\mathbf{0.042 \pm 0.013}$ & $\mathbf{0.010 \pm 0.002}$
+  & $1.83 \pm 0.08$ \\
+adaptive $c\!=\!2.0$ & $0.069 \pm 0.029$ & $0.023 \pm 0.001$ & $0.047 \pm 0.018$
+  & $0.010 \pm 0.003$ & $2.04 \pm 0.06$ \\
+adaptive $c\!=\!5.0$ & $0.160 \pm 0.086$ & $0.026 \pm 0.003$ & $0.121 \pm 0.071$
+  & $0.013 \pm 0.003$ & $2.93 \pm 0.03$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Finding~1: Adaptive $h$ dramatically improves score homogeneity.}
+The best adaptive configuration ($c = 1.5$) achieves
+$\mathrm{KS}_{\max} = 0.065$, compared to the best fixed
+($\mathrm{fixed\_cv}$, $0.189$) --- a $3\times$ reduction. This
+directly validates Proposition~\ref{prop:homogeneity}.
+
+\paragraph{Finding~2: Coverage gap tracks homogeneity, not estimation
+accuracy.}
+All fixed bandwidths have similar $q$-error (sup) $\approx 1.83$ (they
+share the same $e\kern-0.5pt\ell_x, \lambda$), yet
+$\mathrm{fixed\_large}$ has the worst coverage gap ($0.131$) while
+$\mathrm{fixed\_small}$ has a smaller gap ($0.105$). Meanwhile,
+adaptive $c = 1.5$ has the same $q$-error but the lowest coverage gap
+($0.042$). This confirms that \emph{homogeneity, not estimation
+accuracy, determines conditional coverage}.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{\figdir/fig1_score_homogeneity_profile_mild.png}
+\caption{Phase~1 (\texttt{mild}): KS distance from pooled score
+  distribution vs.\ $x$, comparing \texttt{fixed\_cv} (left) and
+  \texttt{adaptive\_c2.0} (right). Mean $\pm$ 1SD across 5 macroreps.
+  Adaptive bandwidth produces a flatter KS profile, indicating more
+  homogeneous scores across $x$.}
+\label{fig:homog-mild}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{\figdir/fig2_coverage_curve_mild.png}
+\caption{Phase~1 (\texttt{mild}): conditional coverage vs.\ $x$ for
+  selected bandwidth configurations. Mean $\pm$ 1SD across 5 macroreps.
+  Dashed line = target $1 - \alpha = 0.9$. Adaptive bandwidths maintain
+  coverage closer to the target across the full input range.}
+\label{fig:coverage-mild}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsection{Phase 2: Extreme Heteroscedasticity (\texttt{exp2})}
+\label{sec:results-exp2}
+% ------------------------------------------------------------------
+
+\begin{table}[h]
+\centering
+\small
+\caption{Phase~2 (\texttt{exp2}): selected bandwidth configurations.}
+\label{tab:exp2}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Bandwidth} & \textbf{KS$_{\max}$} & \textbf{KS$_{\mathrm{mean}}$}
+  & \textbf{Cov gap (sup)} & \textbf{Cov gap (MAE)} & \textbf{$q$-err (sup)} \\
+\midrule
+fixed\_small & $0.806 \pm 0.006$ & $0.264 \pm 0.008$ & $0.171 \pm 0.058$
+  & $0.065 \pm 0.010$ & $1.36 \pm 0.58$ \\
+fixed\_cv    & $0.806 \pm 0.003$ & $0.289 \pm 0.006$ & $0.168 \pm 0.057$
+  & $0.076 \pm 0.011$ & $1.33 \pm 0.57$ \\
+fixed\_large & $0.808 \pm 0.013$ & $0.341 \pm 0.005$ & $0.245 \pm 0.062$
+  & $0.099 \pm 0.008$ & $1.62 \pm 0.22$ \\
+\midrule
+adaptive $c\!=\!1.0$ & $0.743 \pm 0.026$ & $0.182 \pm 0.003$ & $0.114 \pm 0.030$
+  & $0.048 \pm 0.015$ & $2.48 \pm 0.08$ \\
+adaptive $c\!=\!2.0$ & $0.661 \pm 0.025$ & $0.136 \pm 0.003$ & $0.113 \pm 0.029$
+  & $0.037 \pm 0.013$ & $3.86 \pm 0.17$ \\
+adaptive $c\!=\!5.0$ & $\mathbf{0.479 \pm 0.004}$ & $\mathbf{0.076 \pm 0.003}$
+  & $0.153 \pm 0.093$ & $\mathbf{0.031 \pm 0.010}$ & $4.78 \pm 0.26$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Finding~3: Extreme $\sigma$-ratio reveals finite-sample limits.}
+With $\sigma$-ratio $\approx 200\times$, even the best adaptive
+configuration ($c = 5.0$) achieves $\mathrm{KS}_{\max} = 0.479$,
+much higher than Phase~1. All fixed bandwidths have
+$\mathrm{KS}_{\max} > 0.8$, reflecting near-total score heterogeneity.
+The near-zero $\sigma(\pi) \approx 0.1$ creates degenerate CDF
+estimates that limit homogeneity improvement.
+
+\paragraph{Finding~4: Decoupling is even more pronounced.}
+The $q$-error (sup) \emph{increases} from $c = 0.5$ ($1.23$) to
+$c = 5.0$ ($4.78$), while the coverage MAE \emph{decreases} from
+$0.052$ to $0.031$. This anti-diagonal pattern between estimation
+accuracy and conditional coverage is the hallmark of the decoupling
+predicted by the score homogeneity theory.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{\figdir/fig1_score_homogeneity_profile_exp2.png}
+\caption{Phase~2 (\texttt{exp2}): KS distance from pooled score
+  distribution vs.\ $x$. The extreme $\sigma$-ratio ($\sim$200$\times$)
+  causes high KS values even for adaptive bandwidth, especially near
+  $x = \pi$ where $\sigma(x) \to 0$.}
+\label{fig:homog-exp2}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{\figdir/fig2_coverage_curve_exp2.png}
+\caption{Phase~2 (\texttt{exp2}): conditional coverage vs.\ $x$.
+  Fixed bandwidths show large coverage deviations; adaptive bandwidths
+  reduce the gap but cannot fully resolve the near-zero-$\sigma$ region
+  at $x \approx \pi$.}
+\label{fig:coverage-exp2}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsection{Phase 3: Non-Gaussian (\texttt{nongauss\_B2L})}
+\label{sec:results-B2L}
+% ------------------------------------------------------------------
+
+\begin{table}[h]
+\centering
+\small
+\caption{Phase~3 (\texttt{nongauss\_B2L}): selected bandwidth configurations.}
+\label{tab:B2L}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Bandwidth} & \textbf{KS$_{\max}$} & \textbf{KS$_{\mathrm{mean}}$}
+  & \textbf{Cov gap (sup)} & \textbf{Cov gap (MAE)} & \textbf{$q$-err (sup)} \\
+\midrule
+fixed\_small & $0.459 \pm 0.022$ & $0.182 \pm 0.007$ & $0.156 \pm 0.021$
+  & $0.060 \pm 0.005$ & $1.04 \pm 0.61$ \\
+fixed\_cv    & $0.445 \pm 0.017$ & $0.189 \pm 0.006$ & $0.177 \pm 0.020$
+  & $0.064 \pm 0.004$ & $1.02 \pm 0.61$ \\
+fixed\_large & $0.485 \pm 0.013$ & $0.278 \pm 0.003$ & $0.287 \pm 0.053$
+  & $0.098 \pm 0.006$ & $1.46 \pm 0.12$ \\
+\midrule
+adaptive $c\!=\!1.0$ & $0.263 \pm 0.032$ & $0.082 \pm 0.003$ & $0.072 \pm 0.010$
+  & $0.028 \pm 0.005$ & $1.81 \pm 0.10$ \\
+adaptive $c\!=\!1.5$ & $\mathbf{0.172 \pm 0.024}$ & $0.058 \pm 0.005$
+  & $\mathbf{0.070 \pm 0.025}$ & $\mathbf{0.023 \pm 0.004}$
+  & $2.34 \pm 0.04$ \\
+adaptive $c\!=\!2.0$ & $0.167 \pm 0.023$ & $\mathbf{0.048 \pm 0.006}$
+  & $0.095 \pm 0.034$ & $0.021 \pm 0.006$ & $2.89 \pm 0.21$ \\
+adaptive $c\!=\!5.0$ & $0.328 \pm 0.037$ & $0.051 \pm 0.006$
+  & $0.293 \pm 0.033$ & $0.025 \pm 0.009$ & $3.82 \pm 0.35$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Finding~5: Score homogeneity extends to non-Gaussian noise.}
+Despite Gamma($k$=2) noise (strong positive skew), adaptive $c = 1.5$
+achieves $\mathrm{KS}_{\max} = 0.172$, compared to the best fixed
+($0.445$) --- a $2.6\times$ reduction. This validates the
+location-scale generalization of Section~\ref{sec:beyond-gaussian}.
+
+\paragraph{Finding~6: Optimal $c$ shifts slightly for non-Gaussian noise.}
+The optimal $c$ for KS$_{\max}$ is $c \approx 1.5$--$2.0$ (non-Gaussian),
+compared to $c \approx 1.0$--$1.5$ (Gaussian, Phase~1). The skewed
+noise CDF requires slightly more smoothing for the kernel estimate
+$\hat{G}_c(z)$ to be stable.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{\figdir/fig2_coverage_curve_nongauss_B2L.png}
+\caption{Phase~3 (\texttt{nongauss\_B2L}): conditional coverage vs.\
+  $x$. Despite non-Gaussian (Gamma) noise, adaptive bandwidths achieve
+  near-uniform coverage, confirming the location-scale generalization.}
+\label{fig:coverage-B2L}
+\end{figure}
+
+% ------------------------------------------------------------------
+\subsection{Cross-Phase: Pareto and Decoupling Plots}
+\label{sec:results-pareto}
+% ------------------------------------------------------------------
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.48\textwidth]{\figdir/fig3_cscan_pareto_mild.png}
+\hfill
+\includegraphics[width=0.48\textwidth]{\figdir/fig3_cscan_pareto_nongauss_B2L.png}
+\caption{Pareto plot: KS$_{\max}$ (score homogeneity) vs.\ coverage gap
+  (sup) for Phase~1 (\texttt{mild}, left) and Phase~3
+  (\texttt{nongauss\_B2L}, right). Circles = adaptive, squares = fixed.
+  Adaptive configurations dominate the lower-left (better) corner.
+  Mean $\pm$ 1SD error bars across 5 macroreps.}
+\label{fig:pareto}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.48\textwidth]{\figdir/fig4_decoupling_mild.png}
+\hfill
+\includegraphics[width=0.48\textwidth]{\figdir/fig4_decoupling_nongauss_B2L.png}
+\caption{Decoupling plot: quantile error (sup) vs.\ coverage gap (sup)
+  for Phase~1 (left) and Phase~3 (right). The anti-diagonal pattern
+  confirms decoupling: adaptive bandwidths trade estimation accuracy
+  for better conditional coverage through score homogeneity.}
+\label{fig:decoupling}
+\end{figure}
+\fi % end \ifpaper\else for Detailed Experiment Results
+
+
+%% ====================================================================
+\section{Discussion}
+\label{sec:discussion}
+%% ====================================================================
+
+\subsection{Theory--Experiment Alignment}
+
+The experiments provide consistent support for all three theoretical
+predictions (based on $n_{\mathrm{macro}} = 5$; further macroreplications
+are planned):
+\begin{enumerate}
+  \item \textbf{Proposition~\ref{prop:homogeneity}:}
+    Adaptive $h$ reduces KS$_{\max}$ by $2.6\times$--$3\times$
+    vs.\ best fixed (Phase~1 and~3). Phase~2's smaller improvement
+    ($1.7\times$) reflects the finite-sample limitation where
+    $\sigma(x) \to 0$.
+  \item \textbf{Decoupling (Section~\ref{sec:two-conditions}):}
+    The anti-diagonal pattern in the decoupling plots ---
+    estimation accuracy vs.\ coverage gap --- is consistently observed
+    across all three phases. Fixed bandwidths cluster in the
+    ``accurate but inhomogeneous'' corner; adaptive bandwidths move
+    toward the ``less accurate but homogeneous'' corner with better
+    coverage.
+  \item \textbf{Location-scale generality (Section~\ref{sec:beyond-gaussian}):}
+    Phase~3 (Gamma noise) shows the same qualitative pattern as
+    Phase~1 (Gaussian noise), confirming that the mechanism depends
+    on the location-scale structure, not the specific noise
+    distribution.
+\end{enumerate}
+
+\subsection{Finite-Sample Limitations}
+
+Phase~2 (\texttt{exp2}) reveals important limits:
+\begin{itemize}
+  \item When $\sigma(x) \to 0$ (at $x \approx \pi$), even adaptive
+    $h(x) = c\,\sigma(x) \to 0$ creates a near-degenerate CDF with
+    $O(h(x))$ resolution, and the KS distance from the pooled
+    distribution remains high.
+  \item Very large $c$ ($c = 5.0$) achieves the best KS$_{\max}$
+    but the worst coverage gap (sup), illustrating the transition
+    toward the over-smoothed collapse regime
+    (Proposition~\ref{prop:oversmooth}).
+  \item The $c$-scan Pareto plot reveals an optimal range
+    $c \approx 1$--$2$ that balances homogeneity and local adaptivity.
+\end{itemize}
+
+\subsection{Practical Implications}
+
+\begin{enumerate}
+  \item \textbf{Bandwidth selection:} Based on the current three-phase
+    evidence, $c \approx 1.5$ appears to be a reasonable default.
+    The coverage gap is relatively insensitive to $c$ in the range
+    $[1, 2]$ across all three phases.
+  \item \textbf{Plug-in estimation:} In practice, $\sigma(x)$ is
+    unknown. The two-stage design provides replication-based estimates
+    $\hat\sigma(x_j)$ from Stage~1, enabling
+    $\hat{h}(x) = c\,\hat\sigma(x)$. The simulation evidence
+    motivates this plug-in approach, but quantifying how
+    $\hat\sigma(x)$ estimation error degrades the homogeneity bound
+    is addressed by the rate analysis in
+    Section~\ref{sec:plugin-rate}.
+  \item \textbf{CDF-first advantage:} The score homogeneity mechanism
+    is specific to CDF-based scores (Remark~\ref{rem:cdf-first}).
+    Quantile-first methods (CQR, DCP-QR) cannot exploit this regime,
+    even with adaptive bandwidth.
+\end{enumerate}
+
+\subsection{Comparison with Related Theoretical Frameworks}
+\label{sec:related-comparison}
+
+We position our score homogeneity results relative to two recent
+frameworks for conditional conformal prediction: CP$^2$ \cite{CP2}
+and RCP \cite{RCP}. Table~\ref{tab:comparison} summarizes the
+comparison.
+
+\paragraph{vs.\ CP$^2$ (Gibbs, Cherian, Cand\`{e}s 2023).}
+CP$^2$ provides a general conditional coverage framework via RKHS
+regularization. It bounds the conditional coverage gap by
+$\|f\|_{\mathcal{H}} \cdot R_n$, where $\|f\|_{\mathcal{H}}$ is a
+score distribution regularity term and $R_n$ a calibration error.
+This is a powerful ``black-box'' result: it applies broadly but does
+not identify \emph{when} the score distribution is well-behaved, nor
+does it connect to any specific method parameter.
+
+Our contribution fills this gap in two ways:
+\begin{enumerate}
+  \item \textbf{Sufficient condition.} We identify a concrete,
+    verifiable condition --- $h(x) = c\,\sigma(x)$ under a
+    location-scale model --- that makes the CDF-based score
+    distribution $x$-independent.
+  \item \textbf{Explicit quantitative bound.} Using the classical
+    result of Devroye and Gy\"{o}rfi (1985) \cite{DG85} for the
+    logistic kernel, we obtain
+    \[
+      d_{\mathrm{TV}}(\psi_c * g,\; g)
+        \le \frac{\pi^2 c^2}{6}\,\|g''\|_1,
+    \]
+    where $\psi_c$ is the logistic kernel scaled by $c$. This yields
+    $d_{\mathrm{TV}}(F_{s|x}, F_{s,\mathrm{pivot}})
+      \le \frac{\pi^2 c^2}{6}\,\|g''\|_1 + O_p(n^{-s})$,
+    separating smoothing bias from regression error.
+    The bound is computable: given $c$ and the noise density $g$, one
+    evaluates $\|g''\|_1$ directly.
+\end{enumerate}
+
+In short, CP$^2$ says ``if the score distribution is regular enough,
+coverage is good''; we say ``under adaptive bandwidth, the score
+distribution \emph{is} regular, and here is the explicit bound.''
+
+\paragraph{vs.\ RCP (Rectified Conformal Prediction).}
+RCP addresses the same problem --- score heterogeneity degrades
+conditional coverage --- but operates on a fundamentally different
+error decomposition (see Section~\ref{sec:error-comparison} for the
+formal comparison). RCP's coverage bound is controlled by the
+\emph{quantile-of-score estimation error}
+$\sup_x |\hat\tau(x) - \tau(x)|$, where $\hat\tau(x)$ estimates the
+conditional quantile of the rectified score. Our coverage is instead
+controlled by $d_{\mathrm{TV}}(F_{s|x}, F_{s,\mathrm{pivot}})$, which
+decomposes into smoothing bias $O(c^2)$ and CDF estimation error
+$O_p(n^{-s})$.
+
+The practical consequence is that our approach achieves score
+homogeneity \emph{without any post-hoc transformation}: under
+adaptive bandwidth, the CDF-first scores are structurally
+$x$-independent (``natural rectification''), whereas RCP requires
+(i)~estimating a rectification map $T$, (ii)~additional sample
+splitting, and (iii)~Lipschitz regularity conditions on $T$.
+This is specific to CDF-based scores --- quantile-first methods
+(CQR, DCP-QR) do not admit this mechanism.
+
+\paragraph{Additional elements.}
+Two aspects of our analysis, to our knowledge, are not addressed by
+either CP$^2$ or RCP:
+
+\begin{enumerate}
+  \item \textbf{Two-condition framework (Section~\ref{sec:two-conditions}).}
+    To our knowledge, neither CP$^2$ nor RCP explicitly distinguishes
+    between ``useful'' and ``trivial'' score homogeneity. We show that
+    $h \to \infty$ also
+    produces $x$-independent scores (Proposition~\ref{prop:oversmooth}),
+    but with degenerate constant-width intervals. Our joint requirement
+    of homogeneity \emph{plus} local adaptivity
+    ($W(x)/\sigma(x) \to \mathrm{const}$) excludes this trivial
+    regime and pins down the useful range $c \in [1, 2]$.
+  \item \textbf{Explicit bias--variance decomposition in $c$.}
+    The total $d_{\mathrm{TV}}$ decomposes as
+    $\underbrace{\tfrac{\pi^2 c^2}{6}\|g''\|_1}_{\text{smoothing bias}}
+    + \underbrace{O_p(n^{-s})}_{\text{regression error}}$.
+    Small $c$ reduces smoothing bias but increases regression error
+    (CDF estimate variance); large $c$ does the reverse. This
+    decomposition provides an explicit, operational guide for bandwidth
+    selection in the conformal prediction setting, and it is consistent
+    with the experimentally observed optimal range.
+\end{enumerate}
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of conditional coverage frameworks.}
+\label{tab:comparison}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+  & CP$^2$ & RCP & Ours \\
+\midrule
+Sufficient condition for homogeneity
+  & \texttimes & via $T(s,x)$ & $h = c\,\sigma(x)$ \\
+Quantitative bound
+  & implicit (RKHS) & Lipschitz & $\pi^2 c^2/6 \cdot \|g''\|_1$ \\
+Extra estimation step
+  & --- & estimate $T$ & none \\
+Excludes over-smoothed collapse
+  & \texttimes & \texttimes & \checkmark \\
+Bandwidth selection guidance
+  & \texttimes & \texttimes & \checkmark \\
+Scope
+  & general & general & location-scale \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Scope trade-off.}
+Our results apply to the location-scale family
+$Y = f(x) + \sigma(x)\varepsilon$, which is narrower than the
+settings of CP$^2$ or RCP. Within this class, however, the analysis yields more explicit and
+operational conclusions: a verifiable sufficient condition, a
+computable bound, and a principled bandwidth selection rule. For
+applications where location-scale is a reasonable model (simulation,
+engineering reliability, heteroscedastic regression), these concrete
+results complement the broader but more implicit guarantees of
+CP$^2$ and RCP.
+
+
+%% ====================================================================
+% NOTE-ONLY: development memo, not for paper
+\ifpaper\else
+\section{Connection to Full Paper}
+\label{sec:connection}
+%% ====================================================================
+
+This note expands Section~4 of \texttt{paper\_strategy\_memo.tex}
+(Result~2: Score Homogeneity Theorem). For the paper version:
+
+\begin{itemize}
+  \item \textbf{Keep:} Theorem statement, effective bandwidth argument,
+    over-smoothed collapse proposition, CP$^2$ connection, and summary
+    results table (one selected table, e.g., Phase~1).
+  \item \textbf{Condense:} The three-phase experiment can be summarized
+    in one paragraph with a reference to the supplementary material.
+    The full tables (Tables~\ref{tab:mild}--\ref{tab:B2L}) move to an
+    appendix.
+  \item \textbf{Add for paper:} Formal proof of
+    Theorem~\ref{prop:homogeneity} (currently proof sketch), plug-in
+    stability proposition, and comparison with RCP's rectification
+    approach.
+\end{itemize}
+
+\paragraph{Open questions.}
+\begin{enumerate}
+  \item Can the optimal $c$ be determined from the noise distribution
+    $G$ without a grid search?
+  \item Does the homogeneity mechanism extend to higher-dimensional
+    inputs ($d > 1$)?
+  \item How does plug-in $\hat\sigma(x)$ estimation error degrade the
+    homogeneity bound quantitatively?
+\end{enumerate}
+\fi % end \ifpaper\else for Connection to Full Paper
+
+
+%% ====================================================================
+%% References (placeholder)
+%% ====================================================================
+\begin{thebibliography}{9}
+\bibitem{CP2}
+  Gibbs, I., Cherian, J.J., and Cand\`{e}s, E.J. (2023).
+  Conformal prediction with conditional guarantees.
+  \emph{arXiv:2305.12616}.
+
+\bibitem{RCP}
+  Bhatnagar, A., Wang, H., Xiong, C., and Bai, Y. (2025).
+  Improved conditional coverage via rectified conformity scores.
+  \emph{arXiv:2502.16336v2}.
+
+\bibitem{Barber2023}
+  Barber, R.F., Cand\`{e}s, E.J., Ramdas, A., and Tibshirani, R.J. (2023).
+  Conformal prediction beyond exchangeability.
+  \emph{Annals of Statistics}, 51(2), 816--845.
+
+\bibitem{DG85}
+  Devroye, L. and Gy\"{o}rfi, L. (1985).
+  \emph{Nonparametric Density Estimation: The $L_1$ View}.
+  Wiley, New York.
+\end{thebibliography}
+
+\end{document}
