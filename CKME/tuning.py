@@ -57,26 +57,11 @@ class CVResult:
 
     fold_losses : List[float]
         Loss value for each CV fold (validation loss).
-
-    # ========================================================================
-    # DIAGNOSTIC FIELDS (for Step 3 overfitting check)
-    # These fields are added for diagnostic purposes and may be removed later.
-    # ========================================================================
-    mean_train_loss : Optional[float] = None
-        Mean training loss across all CV folds (for overfitting detection).
-    std_train_loss : Optional[float] = None
-        Standard deviation of training loss across CV folds.
-    fold_train_losses : List[float] = field(default_factory=list)
-        Training loss value for each CV fold.
     """
     params: Params
     mean_loss: float
     std_loss: float
     fold_losses: List[float] = field(default_factory=list)
-    # DIAGNOSTIC: Train loss fields (may be removed later)
-    mean_train_loss: Optional[float] = None
-    std_train_loss: Optional[float] = None
-    fold_train_losses: List[float] = field(default_factory=list)
 
 
 @dataclass
@@ -124,73 +109,32 @@ def _evaluate_single_fold(
     params: Params,
     t_grid: ArrayLike,
     loss_fn: CRPSLoss,
-) -> Tuple[float, float]:
+) -> float:
     """
     Evaluate a single parameter combination on a single CV fold.
-
-    This is an internal helper function used for parallelization.
 
     Parameters
     ----------
     X_train_fold : ndarray, shape (n_train, d)
-        Training inputs for this fold.
-
     Y_train_fold : ndarray, shape (n_train,)
-        Training outputs for this fold.
-
     X_val_fold : ndarray, shape (n_val, d)
-        Validation inputs for this fold.
-
     Y_val_fold : ndarray, shape (n_val,)
-        Validation outputs for this fold.
-
     params : Params
-        Parameter combination to evaluate.
-
     t_grid : ndarray, shape (M,)
-        Threshold grid for CDF evaluation.
-
     loss_fn : CRPSLoss
-        Loss function object.
 
     Returns
     -------
     val_loss : float
         Validation loss value for this fold.
-    train_loss : float
-        Training loss value for this fold (for diagnostic purposes).
-        
-    Note
-    ----
-    # ========================================================================
-    # DIAGNOSTIC MODIFICATION: Now returns both train_loss and val_loss
-    # This modification is for Step 3 overfitting detection.
-    # May be reverted later if train_loss is not needed.
-    # ========================================================================
     """
-    # Compute CDF predictions on validation set
     F_pred_val = compute_ckme_cdf(
         X_train_fold, Y_train_fold, params,
         X_val_fold, t_grid,
         clip=True
     )
-
-    # Compute validation loss
     val_loss = loss_fn.compute(F_pred_val, Y_val_fold, t_grid)
-    
-    # ========================================================================
-    # DIAGNOSTIC: Compute training loss (for overfitting detection)
-    # This computes loss on training fold to detect overfitting.
-    # May be removed later if not needed.
-    # ========================================================================
-    F_pred_train = compute_ckme_cdf(
-        X_train_fold, Y_train_fold, params,
-        X_train_fold, t_grid,  # Predict on training data
-        clip=True
-    )
-    train_loss = loss_fn.compute(F_pred_train, Y_train_fold, t_grid)
-    
-    return float(val_loss), float(train_loss)
+    return float(val_loss)
 
 
 # ---------------------------------------------------------------------------
@@ -286,29 +230,15 @@ def _evaluate_params_cv(
             for X_train_fold, Y_train_fold, X_val_fold, Y_val_fold in fold_tasks
         ]
 
-    # Unpack results: (val_loss, train_loss) tuples
-    fold_val_losses = np.array([r[0] for r in fold_results])
-    fold_train_losses = np.array([r[1] for r in fold_results])
-
-    # Compute statistics for validation loss
-    mean_loss = float(np.mean(fold_val_losses))
-    std_loss = float(np.std(fold_val_losses))
-    
-    # ========================================================================
-    # DIAGNOSTIC: Compute statistics for training loss
-    # ========================================================================
-    mean_train_loss = float(np.mean(fold_train_losses))
-    std_train_loss = float(np.std(fold_train_losses))
+    fold_losses = np.array(fold_results, dtype=float)
+    mean_loss = float(np.mean(fold_losses))
+    std_loss = float(np.std(fold_losses))
 
     return CVResult(
         params=params,
         mean_loss=mean_loss,
         std_loss=std_loss,
-        fold_losses=fold_val_losses.tolist(),
-        # DIAGNOSTIC: Add training loss statistics
-        mean_train_loss=mean_train_loss,
-        std_train_loss=std_train_loss,
-        fold_train_losses=fold_train_losses.tolist(),
+        fold_losses=fold_losses.tolist(),
     )
 
 

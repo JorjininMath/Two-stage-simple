@@ -82,6 +82,7 @@ def run_stage2(
     mixed_ratio: float = 0.7,
     random_state: Optional[int] = None,
     verbose: bool = False,
+    s0_score_type: str = "tail",
 ) -> Stage2Result:
     """
     Run Stage 2: select sites, collect D_1, calibrate CP.
@@ -126,7 +127,10 @@ def run_stage2(
         X_bounds = exp_config["bounds"]
 
     # S^0
-    s0 = compute_s0(res, X_cand, alpha=alpha)
+    s0 = compute_s0(
+        res, X_cand, alpha=alpha, score_type=s0_score_type,
+        random_state=random_state,
+    )
     if verbose:
         print(f"Stage 2: S^0 range [{s0.min():.4f}, {s0.max():.4f}]")
 

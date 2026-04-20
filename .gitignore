@@ -1,5 +1,13 @@
-# Local working notes
+# Local working notes (AI instructions, planning docs, journals — not for public repo)
 PROMPT.md
+CLAUDE.md
+JOURNAL_PLAN.md
+EXPERIMENTS.md
+MEMORY.md
+subagent.md
+
+# Claude Code local config
+.claude/
 
 # macOS
 .DS_Store
@@ -11,13 +19,10 @@ __pycache__/
 .venv/
 .env
 
-# Experiment outputs
-exp2_test/output/
-exp3_test/output/
-exp3_test/output/
-exp_nongauss/output/
-exp_stage2_impact_arc/output/
-exp_stage2_impact_arc/slurm_logs/
+# Experiment outputs (any output/ folder anywhere in the tree)
+**/output/
+**/output_*/
+**/slurm_logs/
 temp_exp_code/
 
 # Deprecated legacy implementation (superseded by CKME/ and Two_stage/)
@@ -31,3 +36,10 @@ core/
 
 # R
 .Rhistory
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz

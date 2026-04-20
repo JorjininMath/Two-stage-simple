@@ -33,12 +33,17 @@ from __future__ import annotations
 from typing import Dict, Literal, Type, Union
 
 from .crps import CRPSLoss
+from .pinball import OneSidedPinballLoss, HybridCRPSPinballLoss, IntervalScoreLoss
 
 ArrayLike = "np.ndarray"  # Type hint string to avoid import
 
 LossType = Literal["crps"]
 
-__all__ = ["CRPSLoss", "make_loss", "register_loss", "get_loss", "LossType"]
+__all__ = [
+    "CRPSLoss", "OneSidedPinballLoss", "HybridCRPSPinballLoss",
+    "IntervalScoreLoss",
+    "make_loss", "register_loss", "get_loss", "LossType",
+]
 
 
 # ---------------------------------------------------------------------------
