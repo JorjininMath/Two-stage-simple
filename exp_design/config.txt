@@ -1,0 +1,7 @@
+# exp_design: Stage design experiment.
+# DGP-specific settings (n_0, r_0, n_1, r_1) are in run script.
+alpha         = 0.1
+n_test        = 1000
+r_test        = 1
+n_cand        = 1000
+t_grid_size   = 500

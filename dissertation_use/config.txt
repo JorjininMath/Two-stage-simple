@@ -1,0 +1,16 @@
+# dissertation_use: Group conditional coverage experiment.
+# Two DGPs: exp2 (Gaussian), nongauss_A1L (Student-t nu=3).
+# Both share sigma(x) = 0.01 + 0.2*(x-pi)^2, x in [0, 2*pi].
+simulator_func = exp2
+n_0 = 250
+r_0 = 20
+n_1 = 500
+r_1 = 10
+n_test = 1000
+r_test = 1
+n_cand = 1000
+t_grid_size = 500
+ell_x = 1.0
+lam = 1e-2
+h = 0.3
+alpha = 0.1

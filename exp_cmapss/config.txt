@@ -1,0 +1,23 @@
+# C-MAPSS FD001 Experiment Config
+
+# Data
+data_dir = exp_cmapss/data
+rul_cap = 125
+window_size = 20
+train_frac = 0.7         # fraction of train engines used for CKME training (rest = calibration)
+random_state = 42
+
+# CKME model
+t_grid_size = 300
+ell_x = 1.0
+lam = 0.01
+h = 0.3
+
+# Conformal prediction
+alpha = 0.1              # target 90% coverage
+
+# Stage 2 high-risk threshold
+late_stage_rul = 30      # RUL <= this defines the high-risk calibration subset
+
+# Output
+output_dir = exp_cmapss/output

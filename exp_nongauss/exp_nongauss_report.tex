@@ -1,0 +1,268 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+% Search for figures in both locations (works whether pdflatex is run from
+% exp_nongauss/ or from the project root)
+\graphicspath{{output/}{exp_nongauss/output/}}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{parskip}
+
+\title{Non-Gaussian Noise Experiment: \\
+       CKME vs.\ DCP-DR vs.\ hetGP}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Experiment Overview}
+
+This experiment evaluates how the CKME method compares to two benchmarks---DCP-DR and hetGP---when the conditional noise distribution departs from Gaussianity.
+All six simulators share the same true response function and the same target noise variance, so that coverage and width differences are attributable solely to the shape of the noise, not its scale.
+
+\section{Data-Generating Process}
+
+\subsection{Response Function}
+
+The true response function is
+\[
+  f(x) = e^{x/10}\sin(x), \quad x \in [0,\, 2\pi].
+\]
+The input domain is one-dimensional and the function exhibits moderate amplitude growth with oscillation.
+
+\subsection{Target Noise Variance (Heteroscedastic)}
+
+All six simulators are calibrated to a shared target noise standard deviation:
+\[
+  \sigma_{\mathrm{tar}}(x) = 0.1 + 0.1(x - \pi)^2.
+\]
+This is smallest at $x = \pi$ ($\sigma_{\mathrm{tar}}(\pi) = 0.1$) and grows symmetrically toward both ends of $[0, 2\pi]$, reaching about $0.1 + 0.1\pi^2 \approx 1.09$ at the boundaries.
+The calibration ensures that differences in interval width across methods cannot be explained by differences in assumed noise magnitude---only by how well each method captures the shape of the noise distribution.
+
+\subsection{Six Noise Families}
+
+Three distributional families are considered, each at two severity levels (Small/Large):
+
+\paragraph{A1 --- Student-$t$ (heavy tails).}
+\[
+  Y = f(x) + s_\nu(x)\, T_\nu, \quad T_\nu \sim t_\nu,
+  \quad s_\nu(x) = \sigma_{\mathrm{tar}}(x)\sqrt{\frac{\nu-2}{\nu}}.
+\]
+The scale $s_\nu(x)$ ensures $\mathrm{Var}(Y \mid x) = \sigma_{\mathrm{tar}}(x)^2$.
+\begin{itemize}
+  \item A1-S: $\nu = 10$ (light tails, near-Gaussian)
+  \item A1-L: $\nu = 3$ (heavy tails)
+\end{itemize}
+
+\paragraph{B2 --- Centered Gamma (skewness).}
+\[
+  Y = f(x) + \varepsilon, \quad \varepsilon = G - k\theta(x),
+  \quad G \sim \mathrm{Gamma}(k,\, \theta(x)),
+  \quad \theta(x) = \frac{\sigma_{\mathrm{tar}}(x)}{\sqrt{k}}.
+\]
+Centering ensures $\mathbb{E}[\varepsilon \mid x] = 0$ and $\mathrm{Var}(\varepsilon \mid x) = \sigma_{\mathrm{tar}}(x)^2$.
+Skewness $= 2/\sqrt{k}$.
+\begin{itemize}
+  \item B2-S: $k = 9$ (mild skew, skewness $\approx 0.67$)
+  \item B2-L: $k = 2$ (strong skew, skewness $\approx 1.41$)
+\end{itemize}
+
+\paragraph{C1 --- Shifted Gaussian Mixture (bimodal contamination).}
+The noise is a two-component mixture with shifted means to ensure exact zero conditional expectation and heteroscedastic scaling:
+\[
+  \varepsilon \mid x \;\sim\;
+    (1-\pi_{\mathrm{mix}})\,\mathcal{N}\!\bigl(\mu_1(x),\,(a s_1 \sigma_{\mathrm{tar}}(x))^2\bigr)
+  + \pi_{\mathrm{mix}}\,\mathcal{N}\!\bigl(\mu_2(x),\,(a s_2 \sigma_{\mathrm{tar}}(x))^2\bigr),
+\]
+where
+\[
+  \mu_1(x) = -a\,\pi_{\mathrm{mix}}\,\delta\,\sigma_{\mathrm{tar}}(x), \qquad
+  \mu_2(x) = a\,(1-\pi_{\mathrm{mix}})\,\delta\,\sigma_{\mathrm{tar}}(x),
+\]
+\[
+  a = \frac{1}{\sqrt{(1-\pi_{\mathrm{mix}})s_1^2 + \pi_{\mathrm{mix}} s_2^2
+                     + \pi_{\mathrm{mix}}(1-\pi_{\mathrm{mix}})\delta^2}},
+\]
+with fixed shape parameters $s_1 = 0.35$ (inlier), $s_2 = 1.0$ (outlier), $\delta = 4.0$ (shift strength).
+By construction, $\mathbb{E}[\varepsilon \mid x] = 0$ and $\mathrm{Var}(\varepsilon \mid x) = \sigma_{\mathrm{tar}}(x)^2$ exactly.
+The inlier component (probability $1-\pi_{\mathrm{mix}}$) is narrow and slightly left-shifted; the outlier component (probability $\pi_{\mathrm{mix}}$) is shifted to the right by $\approx a(1-\pi_{\mathrm{mix}})\delta\,\sigma_{\mathrm{tar}}(x)$, creating bimodality.
+Unlike the original formulation, the C1 noise is \emph{heteroscedastic} (both means and standard deviations scale with $\sigma_{\mathrm{tar}}(x)$).
+\begin{itemize}
+  \item C1-S: $\pi_{\mathrm{mix}} = 0.02$ (2\% outlier probability, mild bimodality)
+  \item C1-L: $\pi_{\mathrm{mix}} = 0.10$ (10\% outlier probability, strong bimodality)
+\end{itemize}
+
+Figure~\ref{fig:noise} shows the noise distributions at the center point $x = \pi$ for all six cases, overlaid with a reference Gaussian of the same variance.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{nongauss_noise.png}
+  \caption{Noise distributions at $x = \pi$ for all six simulators, compared to a
+           reference Gaussian $\mathcal{N}(0,\,\sigma_{\mathrm{tar}}(\pi)^2)$ (dashed).
+           \emph{Top row}: Small (mild non-Gaussianity); \emph{Bottom row}: Large (strong).
+           Column A1 shows heavy tails; B2 shows right skewness; C1 shows bimodal
+           structure with a dominant inlier peak and a shifted outlier cluster.}
+  \label{fig:noise}
+\end{figure}
+
+\section{Experimental Setup}
+
+\subsection{Two-Stage Design}
+
+All experiments use the CKME two-stage pipeline with Latin Hypercube Sampling (LHS) for site selection:
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Parameter} & \textbf{Value} \\
+  \midrule
+  Stage 1 sites ($n_0$) & 250 \\
+  Stage 1 replications ($r_0$) & 20 \\
+  Stage 2 sites ($n_1$) & 500 \\
+  Stage 2 replications ($r_1$) & 10 \\
+  Total Stage 1 observations & 5{,}000 \\
+  Total Stage 2 observations & 5{,}000 \\
+  Candidate sites for Stage 2 ($n_{\mathrm{cand}}$) & 1{,}000 \\
+  Site selection method & LHS \\
+  Test points ($n_{\mathrm{test}}$) & 1{,}000 \\
+  Test replications ($r_{\mathrm{test}}$) & 1 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Hyperparameters}
+
+CKME hyperparameters were tuned via 5-fold cross-validation (CRPS loss) before the main experiment.
+All six simulators converged to the same optimal values:
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  $\ell_x$ (RBF length scale) & $\lambda$ (regularization) & $h$ (indicator bandwidth) \\
+  \midrule
+  $0.5$ & $0.001$ & $0.1$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Evaluation}
+
+The CP significance level is $\alpha = 0.10$, targeting 90\% marginal coverage.
+All results are averaged over $n_{\mathrm{macro}} = 50$ independent macroreplications for CKME; R benchmarks completed fewer due to numerical failures (DCP-DR: 32--48, hetGP: 32--48 depending on simulator).
+Three metrics are reported:
+
+\begin{itemize}
+  \item \textbf{Coverage}: Empirical fraction of test points where $Y \in [\hat{L}, \hat{U}]$.
+  \item \textbf{Width}: Average interval length $\hat{U} - \hat{L}$.
+  \item \textbf{Interval Score (IS)}: Winkler score
+  $(\hat{U}-\hat{L}) + \tfrac{2}{\alpha}(\hat{L}-Y)_+ + \tfrac{2}{\alpha}(Y-\hat{U})_+$,
+  jointly penalizing width and miscoverage.
+\end{itemize}
+
+\subsection{Benchmarks}
+
+\begin{itemize}
+  \item \textbf{CKME}: Conditional kernel mean embedding + split conformal prediction, calibrated on Stage 2 data.
+  \item \textbf{DCP-DR}: Distributional conformal prediction via distributional regression (quantile regression forest).
+  \item \textbf{hetGP}: Heteroscedastic Gaussian process (assumes Gaussian noise; R package \texttt{hetGP}).
+\end{itemize}
+
+\clearpage
+\section{Results}
+
+\subsection{Summary Table}
+
+Table~\ref{tab:results} reports width and interval score (mean $\pm$ standard deviation across macroreplications); coverage results are shown in Figure~\ref{fig:cov_width}.
+
+\begin{table}[h]
+\centering
+\caption{Width and interval score (mean $\pm$ sd).
+         CKME: $n=50$ macroreps; R benchmarks: $n$ varies (see text).}
+\label{tab:results}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{llcc}
+\toprule
+\textbf{Simulator} & \textbf{Method} & \textbf{Width} & \textbf{IS} \\
+\midrule
+\multirow{3}{*}{A1-S ($\nu=10$)}
+ & CKME   & $1.324 \pm 0.026$ & $1.954 \pm 0.082$ \\
+ & DCP-DR & $2.694 \pm 0.038$ & $3.677 \pm 0.125$ \\
+ & hetGP  & $1.422 \pm 0.031$ & $1.849 \pm 0.062$ \\
+\midrule
+\multirow{3}{*}{B2-S ($k=9$)}
+ & CKME   & $1.325 \pm 0.026$ & $1.878 \pm 0.082$ \\
+ & DCP-DR & $2.691 \pm 0.041$ & $3.591 \pm 0.122$ \\
+ & hetGP  & $1.411 \pm 0.029$ & $1.787 \pm 0.073$ \\
+\midrule
+\multirow{3}{*}{C1-S ($\pi=0.02$)}
+ & CKME   & $0.793 \pm 0.017$ & $1.978 \pm 0.262$ \\
+ & DCP-DR & $2.457 \pm 0.051$ & $3.681 \pm 0.310$ \\
+ & hetGP  & $1.392 \pm 0.173$ & $2.155 \pm 0.334$ \\
+\midrule
+\multirow{3}{*}{A1-L ($\nu=3$)}
+ & CKME   & $1.082 \pm 0.026$ & $2.042 \pm 0.210$ \\
+ & DCP-DR & $2.585 \pm 0.042$ & $3.717 \pm 0.205$ \\
+ & hetGP  & $1.416 \pm 0.107$ & $2.004 \pm 0.168$ \\
+\midrule
+\multirow{3}{*}{B2-L ($k=2$)}
+ & CKME   & $1.222 \pm 0.028$ & $1.862 \pm 0.102$ \\
+ & DCP-DR & $2.677 \pm 0.043$ & $3.566 \pm 0.153$ \\
+ & hetGP  & $1.415 \pm 0.036$ & $1.910 \pm 0.080$ \\
+\midrule
+\multirow{3}{*}{C1-L ($\pi=0.10$)}
+ & CKME   & $0.969 \pm 0.121$ & $2.398 \pm 0.240$ \\
+ & DCP-DR & $2.780 \pm 0.097$ & $3.684 \pm 0.238$ \\
+ & hetGP  & $1.390 \pm 0.162$ & $2.412 \pm 0.317$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Coverage and Width vs.\ $x$}
+
+Figure~\ref{fig:cov_width} shows pointwise coverage and width as functions of $x$, averaged across macroreplications, for all six simulators.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{nongauss_cov_width.png}
+  \caption{Pointwise coverage (top rows) and width (bottom rows) vs.\ $x \in [0,2\pi]$.
+           Shaded bands show $\pm 1$ sd across macroreplications.
+           The horizontal dashed line at $1-\alpha = 0.90$ marks the nominal coverage target.}
+  \label{fig:cov_width}
+\end{figure}
+
+\subsection{Discussion}
+
+\paragraph{A1 (Student-$t$): heavy tails.}
+All three methods achieve coverage close to 0.90.
+CKME produces noticeably narrower intervals than DCP-DR (width $\approx 1.32$ vs.\ $2.69$) and slightly narrower than hetGP ($\approx 1.42$).
+Interval scores favor hetGP slightly for A1-S ($1.85$ vs.\ $1.95$), but the methods are comparable for A1-L ($2.00$ vs.\ $2.04$).
+This suggests CKME captures the heavier-tailed structure better than hetGP as tail severity increases.
+
+\paragraph{B2 (Centered Gamma): skewness.}
+Results mirror the A1 pattern.
+CKME and hetGP achieve similar width ($\approx 1.22$--$1.41$), while DCP-DR remains wide ($\approx 2.69$).
+Coverage is approximately nominal for CKME ($0.896$) and slightly above for hetGP ($0.91$--$0.93$).
+The asymmetric noise does not appear to degrade CKME's interval quality relative to the symmetric cases.
+
+\paragraph{C1 (Shifted Gaussian Mixture): bimodal contamination.}
+This is the most distinctive case.
+The C1 noise is bimodal: a dominant narrow inlier cluster slightly left of zero, and a rarer but right-shifted outlier cluster, with both means and variances scaling heteroscedastically with $\sigma_{\mathrm{tar}}(x)$.
+CKME produces moderately narrow intervals (width $0.793$ for C1-S, $0.969$ for C1-L)---substantially narrower than DCP-DR ($\approx 2.46$--$2.78$)---while maintaining coverage near nominal ($0.892$, $0.894$).
+The conformal calibration naturally accommodates the bimodal structure via the empirical quantiles of Stage 2 scores.
+hetGP strongly over-covers in C1-S ($0.976$) with a high interval score ($2.16$), as the Gaussian assumption forces wide symmetric intervals to span both modes.
+For C1-L hetGP coverage is closer to nominal ($0.908$) but interval score remains high ($2.41$), indicating poorly shaped intervals.
+DCP-DR consistently produces the widest intervals ($\approx 2.46$--$2.78$) and highest IS across all C1 cases.
+
+\paragraph{Overall.}
+Across all six simulators, CKME consistently achieves coverage near the nominal 90\% while maintaining substantially narrower intervals than DCP-DR.
+Compared to hetGP, CKME is competitive in the heavy-tail and skewed cases (A1, B2) in terms of interval score, and produces narrower, better-calibrated intervals in the bimodal cases (C1) where the Gaussian assumption of hetGP leads to over-coverage and inflated IS.
+
+\end{document}

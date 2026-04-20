@@ -1,0 +1,17 @@
+# exp_allocation: Stage-2 budget allocation and site selection comparison.
+# Paper Experiment 1 (Section 5.2): exp1 and exp2 simulators.
+#
+# n_0, r_0 are overridden per-simulator in run_allocation_compare.py.
+# n_1, r_1 are swept over three allocations per simulator.
+# Stage-2 site selection method is swept over: lhs, sampling, mixed.
+
+# Shared settings
+alpha         = 0.1
+n_test        = 1000
+r_test        = 1
+n_cand        = 3000
+
+# Default CKME hyperparameters (overridden by pretrained_params.json if present)
+ell_x         = 0.5
+lam           = 1e-3
+h             = 0.05

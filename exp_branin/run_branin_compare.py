@@ -1,30 +1,21 @@
 """
-exp_nongauss: Compare CKME, DCP-DR, hetGP on six non-Gaussian noise DGPs.
+run_branin_compare.py
 
-All six cases share the exp2 true function f(x) = exp(x/10)*sin(x), x in [0, 2*pi]
-and target variance sigma_tar(x)^2, sigma_tar(x) = 0.1 + 0.1*(x-pi)^2.
+exp_branin: Compare CKME, DCP-DR, hetGP on 2D Branin-Hoo with two noise settings.
 
-  Small (light non-Gaussianity):
-    nongauss_A1S : Student-t,      nu=10  (light tails)
-    nongauss_B2S : Centered Gamma, k=9    (mild skew)
-    nongauss_C1S : Gaussian mix,   pi=0.02 (light contamination)
+  branin_gauss   : Heteroscedastic Gaussian noise, sigma(x) = 0.4*(4*x1_scaled+1)
+  branin_student : Heteroscedastic Student-t noise, nu(x)=max(2, 6-4*x1_scaled), same sigma
 
-  Large (strong non-Gaussianity):
-    nongauss_A1L : Student-t,      nu=3   (heavy tails)
-    nongauss_B2L : Centered Gamma, k=2    (strong skew)
-    nongauss_C1L : Gaussian mix,   pi=0.10 (heavy contamination)
-
-Supports adaptive bandwidth h(x) = c * sigma_tar(x) for theory-aligned
-group coverage validation (T-G1/T-G2).
+True function: Branin-Hoo, domain x1 in [-5, 10], x2 in [0, 15].
 
 Usage (from project root):
-  python exp_nongauss/run_nongauss_compare.py
-  python exp_nongauss/run_nongauss_compare.py --n_macro 10 --method mixed
-  python exp_nongauss/run_nongauss_compare.py --h_mode adaptive --c_scale 2.0
+  python exp_branin/run_branin_compare.py
+  python exp_branin/run_branin_compare.py --n_macro 10 --method lhs --n_workers 4
 """
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -34,42 +25,33 @@ _root = Path(__file__).resolve().parent.parent
 if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
-import json
-
 import numpy as np
 import pandas as pd
-from exp_nongauss.config_utils import load_config_from_file, get_config, get_x_cand
+
+from CKME.coefficients import compute_ckme_coeffs
+from CKME.indicators import make_indicator
+from exp_branin.config_utils import load_config_from_file, get_config, get_x_cand
 from Two_stage import run_stage1_train, run_stage2
 from Two_stage.evaluation import evaluate_per_point
 from Two_stage.test_data import generate_test_data
-from CKME.coefficients import compute_ckme_coeffs
-from CKME.indicators import make_indicator
-from CP.scores import score_from_cdf
 
 R_SCRIPT = _root / "run_benchmarks_one_case.R"
 
-SIMULATORS = [
-    "nongauss_A1S", "nongauss_B2S", "nongauss_C1S",   # Small (light non-Gaussianity)
-    "nongauss_A1L", "nongauss_B2L", "nongauss_C1L",   # Large (strong non-Gaussianity)
-]
-MIXED_RATIO = 0.7
 
-METHOD_COV   = {"CKME": "covered_score", "DCP-DR": "covered_score_dr", "hetGP": "covered_interval_hetgp"}
-METHOD_WIDTH = {"CKME": "width",            "DCP-DR": "width_dr",             "hetGP": "width_hetgp"}
-METHOD_SCORE = {"CKME": "interval_score",   "DCP-DR": "interval_score_dr",    "hetGP": "interval_score_hetgp"}
+# ---------------------------------------------------------------------------
+# Oracle sigma and adaptive h for Branin-Hoo simulators
+# ---------------------------------------------------------------------------
 
-_PI = np.pi
-
-
-def _nongauss_oracle_var(x: np.ndarray) -> np.ndarray:
-    """Oracle conditional variance for all nongauss sims: sigma_tar(x)^2."""
-    return (0.1 + 0.1 * (x - _PI) ** 2) ** 2
+def _branin_oracle_sigma(x: np.ndarray) -> np.ndarray:
+    """Oracle sigma(x) = 0.4*(4*x1_scaled + 1), shared by branin_gauss/student."""
+    x_2d = np.atleast_2d(x)
+    x1_scaled = (x_2d[:, 0] - (-5.0)) / (10.0 - (-5.0))
+    return 0.4 * (4.0 * x1_scaled + 1.0)
 
 
 def _adaptive_h_vals(model, x_query: np.ndarray, c_scale: float) -> np.ndarray:
-    """h(x) = c_scale * sigma_tar(x) for each query point."""
-    x_1d = x_query.ravel()
-    sigma = np.sqrt(np.maximum(_nongauss_oracle_var(x_1d), 1e-8))
+    """h(x) = c_scale * sigma(x) for each query point."""
+    sigma = np.maximum(_branin_oracle_sigma(x_query), 1e-8)
     return c_scale * sigma
 
 
@@ -146,6 +128,13 @@ def _adaptive_predict_interval(
 
     return L_arr, U_arr
 
+SIMULATORS = ["branin_gauss", "branin_student"]
+MIXED_RATIO = 0.7
+
+METHOD_COV   = {"CKME": "covered_score",  "DCP-DR": "covered_score_dr",  "hetGP": "covered_interval_hetgp"}
+METHOD_WIDTH = {"CKME": "width",           "DCP-DR": "width_dr",          "hetGP": "width_hetgp"}
+METHOD_SCORE = {"CKME": "interval_score",  "DCP-DR": "interval_score_dr", "hetGP": "interval_score_hetgp"}
+
 
 def _run_r_benchmarks(case_dir: Path, output_csv: Path, alpha: float, n_grid: int) -> pd.DataFrame:
     cmd = ["Rscript", str(R_SCRIPT), str(case_dir), str(output_csv), str(alpha), str(n_grid)]
@@ -167,21 +156,20 @@ def run_one_macrorep(
     method: str,
     n_grid: int,
     params=None,
+    skip_r: bool = False,
     h_mode: str = "fixed",
     c_scale: float = 2.0,
 ) -> dict:
     seed = base_seed + macrorep_id * 10000
-    # np.random.seed is intentionally omitted: all simulators and design
-    # functions use np.random.default_rng(random_state), so per-call seeds
-    # below provide full reproducibility without a global legacy seed.
 
-    n_0    = config.get("n_0", 200)
-    r_0    = config.get("r_0", 5)
-    n_1    = config.get("n_1", 100)
-    r_1    = config.get("r_1", 5)
-    alpha  = config["alpha"]
+    n_0   = config.get("n_0", 300)
+    r_0   = config.get("r_0", 10)
+    n_1   = config.get("n_1", 500)
+    r_1   = config.get("r_1", 5)
+    alpha = config["alpha"]
     if params is None:
         params = config["params"]
+
     X_cand = get_x_cand(simulator_func, config["n_cand"], random_state=seed + 1)
 
     stage1 = run_stage1_train(
@@ -218,24 +206,6 @@ def run_one_macrorep(
     eval_result = evaluate_per_point(stage2, X_test, Y_test)
     rows_ckme = eval_result["rows"]
 
-    # Adaptive h: recalibrate CP and recompute coverage/intervals
-    if h_mode == "adaptive":
-        model = stage2.model
-        q_hat_adap = _recalibrate_adaptive_cp(model, stage2, c_scale, alpha)
-        cov_adap = _adaptive_score_coverage(model, X_test, Y_test, q_hat_adap, c_scale)
-        L_adap, U_adap = _adaptive_predict_interval(
-            model, X_test, stage2.t_grid, q_hat_adap, c_scale,
-        )
-        width_adap = U_adap - L_adap
-        from CP.evaluation import compute_interval_score
-        is_adap, _ = compute_interval_score(Y_test.ravel(), L_adap, U_adap, alpha)
-        for i, row in enumerate(rows_ckme):
-            row["covered_score_adaptive"] = int(cov_adap[i])
-            row["L_adaptive"] = float(L_adap[i])
-            row["U_adaptive"] = float(U_adap[i])
-            row["width_adaptive"] = float(width_adap[i])
-            row["interval_score_adaptive"] = float(is_adap[i])
-
     # Save data for R benchmarks
     case_name = f"{simulator_func}_{method}"
     case_dir  = out_dir / f"macrorep_{macrorep_id}" / f"case_{case_name}"
@@ -249,14 +219,33 @@ def run_one_macrorep(
     np.savetxt(rep0_dir / "Y_test.csv", Y_test,          delimiter=",")
 
     bench_csv = case_dir / "benchmarks.csv"
-    try:
-        bench_df = _run_r_benchmarks(case_dir, bench_csv, alpha, n_grid)
+    if not skip_r:
+        try:
+            bench_df = _run_r_benchmarks(case_dir, bench_csv, alpha, n_grid)
+            for i, row in enumerate(rows_ckme):
+                for col in bench_df.columns:
+                    row[col] = bench_df.iloc[i][col]
+        except RuntimeError as e:
+            print(f"  Warning: R benchmarks failed for {simulator_func}; DCP-DR/hetGP will be NaN.\n  {e}",
+                  file=sys.stderr)
+
+    # --- Adaptive h(x) = c * sigma(x) ---
+    if h_mode == "adaptive":
+        model = stage2.model
+        q_hat_adap = _recalibrate_adaptive_cp(model, stage2, c_scale, alpha)
+        cov_adap = _adaptive_score_coverage(model, X_test, Y_test, q_hat_adap, c_scale)
+        L_adap, U_adap = _adaptive_predict_interval(
+            model, X_test, stage2.t_grid, q_hat_adap, c_scale)
+        width_adap = U_adap - L_adap
+        is_adap = width_adap + (2 / alpha) * np.maximum(0, L_adap - Y_test) \
+                  + (2 / alpha) * np.maximum(0, Y_test - U_adap)
         for i, row in enumerate(rows_ckme):
-            for col in bench_df.columns:
-                row[col] = bench_df.iloc[i][col]
-    except RuntimeError as e:
-        print(f"  Warning: R benchmarks failed for {simulator_func}; DCP-DR/hetGP will be NaN.\n  {e}",
-              file=sys.stderr)
+            row["covered_score_adaptive"] = int(cov_adap[i])
+            row["L_adaptive"] = float(L_adap[i])
+            row["U_adaptive"] = float(U_adap[i])
+            row["width_adaptive"] = float(width_adap[i])
+            row["interval_score_adaptive"] = float(is_adap[i])
+
     df = pd.DataFrame(rows_ckme)
     df.to_csv(case_dir / "per_point.csv", index=False)
 
@@ -278,36 +267,37 @@ def run_one_macrorep(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Non-Gaussian comparison: CKME vs DCP-DR vs hetGP")
-    parser.add_argument("--config",     type=str, default="exp_nongauss/config.txt")
+    parser = argparse.ArgumentParser(description="Branin-Hoo comparison: CKME vs DCP-DR vs hetGP")
+    parser.add_argument("--config",     type=str, default="exp_branin/config.txt")
     parser.add_argument("--output_dir", type=str, default=None)
     parser.add_argument("--n_macro",    type=int, default=5)
     parser.add_argument("--base_seed",  type=int, default=42)
     parser.add_argument("--method",     type=str, default="lhs", choices=("lhs", "sampling", "mixed"))
-    parser.add_argument("--h_mode",     type=str, default="fixed", choices=("fixed", "adaptive"),
-                        help="Bandwidth mode: fixed (CV-tuned) or adaptive h(x)=c*sigma_tar(x)")
-    parser.add_argument("--c_scale",    type=float, default=2.0,
-                        help="Scale factor for adaptive-h (default: 2.0)")
     parser.add_argument("--n_workers",  type=int, default=1,
                         help="Number of parallel worker processes for macroreps (default: 1 = sequential)")
+    parser.add_argument("--skip_r",    action="store_true",
+                        help="Skip R benchmarks (DCP-DR, hetGP); run CKME only")
+    parser.add_argument("--sims",      type=str, default=None,
+                        help="Comma-separated subset of simulators (default: all). E.g. --sims branin_student")
+    parser.add_argument("--h_mode",    type=str, default="fixed", choices=("fixed", "adaptive"),
+                        help="Bandwidth mode: fixed (CV-tuned) or adaptive h(x)=c*sigma(x)")
+    parser.add_argument("--c_scale",   type=float, default=2.0,
+                        help="Scale factor for adaptive-h (default: 2.0)")
     args = parser.parse_args()
 
-    config    = get_config(load_config_from_file(_root / args.config), quick=False)
-    n_grid    = config.get("t_grid_size", 500)
+    config  = get_config(load_config_from_file(_root / args.config), quick=False)
+    n_grid  = config.get("t_grid_size", 500)
     if args.output_dir:
         out_dir = Path(args.output_dir)
     elif args.h_mode == "adaptive":
-        out_dir = _root / "exp_nongauss" / f"output_adaptive_c{args.c_scale:.2f}"
+        out_dir = _root / "exp_branin" / f"output_adaptive_c{args.c_scale:.2f}"
     else:
-        out_dir = _root / "exp_nongauss" / "output"
+        out_dir = _root / "exp_branin" / "output"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"h_mode={args.h_mode}" + (f" (c_scale={args.c_scale})" if args.h_mode == "adaptive" else ""))
-    print(f"n_macro={args.n_macro}, method={args.method}, output_dir={out_dir}")
-
-    # Load per-simulator pretrained hyperparameters (produced by pretrain_params.py).
+    # Load per-simulator pretrained hyperparameters (produced by pretrain_params.py)
     from CKME.parameters import Params
-    pretrained_path = _root / "exp_nongauss" / "pretrained_params.json"
+    pretrained_path = _root / "exp_branin" / "pretrained_params.json"
     pretrained: dict = {}
     if pretrained_path.exists():
         with open(pretrained_path) as f:
@@ -317,7 +307,7 @@ def main():
     else:
         print(
             f"Warning: {pretrained_path} not found; using config params for all simulators.\n"
-            "Run 'python exp_nongauss/pretrain_params.py' first to improve accuracy.",
+            "Run 'python exp_branin/pretrain_params.py' first for better accuracy.",
             file=sys.stderr,
         )
 
@@ -325,11 +315,15 @@ def main():
         print(f"Warning: R script not found at {R_SCRIPT}; DCP-DR and hetGP will be missing.",
               file=sys.stderr)
 
+    sims_to_run = [s.strip() for s in args.sims.split(",")] if args.sims else SIMULATORS
+
+    print(f"h_mode={args.h_mode}" + (f" (c_scale={args.c_scale})" if args.h_mode == "adaptive" else ""))
+    print(f"n_macro={args.n_macro}, method={args.method}, output_dir={out_dir}")
+
     all_rows = []
-    for sim in SIMULATORS:
+    for sim in sims_to_run:
         print(f"\n--- Simulator: {sim} ---")
 
-        # Collect one result dict per macrorep (sequential or parallel)
         if args.n_workers > 1:
             with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
                 futs = {
@@ -337,7 +331,7 @@ def main():
                         run_one_macrorep,
                         k, args.base_seed, config, sim,
                         out_dir, args.method, n_grid, pretrained.get(sim),
-                        args.h_mode, args.c_scale,
+                        args.skip_r, args.h_mode, args.c_scale,
                     ): k
                     for k in range(args.n_macro)
                 }
@@ -350,6 +344,7 @@ def main():
         else:
             macrorep_results = []
             for k in range(args.n_macro):
+                print(f"  macrorep {k} ...", flush=True)
                 one = run_one_macrorep(
                     macrorep_id=k,
                     base_seed=args.base_seed,
@@ -359,10 +354,13 @@ def main():
                     method=args.method,
                     n_grid=n_grid,
                     params=pretrained.get(sim),
+                    skip_r=args.skip_r,
                     h_mode=args.h_mode,
                     c_scale=args.c_scale,
                 )
                 macrorep_results.append(one)
+                print(f"  macrorep {k} done: coverage={one.get('CKME_coverage', float('nan')):.3f}, "
+                      f"width={one.get('CKME_width', float('nan')):.3f}")
 
         list_cov   = {m: [] for m in METHOD_COV}
         list_width = {m: [] for m in METHOD_WIDTH}
@@ -383,19 +381,19 @@ def main():
             w_v   = list_width.get(m, [])
             s_v   = list_score.get(m, [])
             all_rows.append({
-                "simulator":            sim,
-                "method":               m,
-                "mean_coverage":        np.mean(cov_v) if cov_v else np.nan,
-                "sd_coverage":          np.std(cov_v, ddof=1) if len(cov_v) > 1 else np.nan,
-                "mean_width":           np.mean(w_v) if w_v else np.nan,
-                "sd_width":             np.std(w_v, ddof=1) if len(w_v) > 1 else np.nan,
-                "mean_interval_score":  np.mean(s_v) if s_v else np.nan,
-                "sd_interval_score":    np.std(s_v, ddof=1) if len(s_v) > 1 else np.nan,
-                "n_macroreps":          len(cov_v),
+                "simulator":           sim,
+                "method":              m,
+                "mean_coverage":       np.mean(cov_v) if cov_v else np.nan,
+                "sd_coverage":         np.std(cov_v, ddof=1) if len(cov_v) > 1 else np.nan,
+                "mean_width":          np.mean(w_v) if w_v else np.nan,
+                "sd_width":            np.std(w_v, ddof=1) if len(w_v) > 1 else np.nan,
+                "mean_interval_score": np.mean(s_v) if s_v else np.nan,
+                "sd_interval_score":   np.std(s_v, ddof=1) if len(s_v) > 1 else np.nan,
+                "n_macroreps":         len(cov_v),
             })
 
     summary = pd.DataFrame(all_rows)
-    summary_path = out_dir / "nongauss_compare_summary.csv"
+    summary_path = out_dir / "branin_compare_summary.csv"
     summary.to_csv(summary_path, index=False)
     print(f"\nWrote {summary_path}")
     print(summary.to_string(index=False))

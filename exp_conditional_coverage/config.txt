@@ -1,0 +1,44 @@
+# Asymptotic conditional coverage experiment config
+# n_vals: comma-separated list of Stage1 design point counts (n_0 = n_1)
+n_vals = 64,128,512,2048,8192
+
+# Per-site replications (fixed)
+r_0 = 1
+r_1 = 1
+
+# CP significance level (target coverage = 1 - alpha)
+alpha = 0.1
+
+# t_grid size for CKME CDF evaluation
+t_grid_size = 300
+
+# Site selection method for Stage 2
+method = mixed
+mixed_ratio = 0.7
+
+# Number of candidate points for Stage 2 selection
+n_cand = 2000
+
+# Evaluation grid: M fixed x-points, B fresh draws per point (Monte Carlo coverage)
+M_eval = 100
+B_test = 2000
+
+# Number of macro-replications
+n_macro = 10
+n_jobs = 5
+cv_max_n = 512
+cv_max_n = 1024
+
+# Base random seed
+base_seed = 42
+
+# Simulators to run (comma-separated)
+simulators = exp1,exp2
+
+# Hyperparameter tuning (two-stage CV: first ell_x+lam, then h)
+tune_params = true
+h_default = 0.2
+ell_x_list = 0.1,0.5,1.0,2.0,3.0
+lam_list = 1e-4,1e-3,1e-2,1e-1
+h_list = 0.05,0.1,0.2,0.3,0.5
+cv_folds = 5

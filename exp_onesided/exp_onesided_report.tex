@@ -1,0 +1,393 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{multirow}
+\graphicspath{{output/}{output_scaling/}{exp_onesided/output/}{exp_onesided/output_scaling/}}
+
+\title{One-Sided Quantile Estimation: CKME vs.\ Linear Quantile Regression\\[0.5em]
+	\large Experiment Summary and Analysis}
+\author{}
+\date{\today}
+
+\begin{document}
+	\maketitle
+	
+	% ===========================================================================
+	\section{Methods}
+	% ===========================================================================
+	
+	\subsection{Quantile estimators}
+	
+	\begin{description}
+		\item[CKME (CDF-first).] We first fit a conditional kernel mean embedding model
+		$\hat{F}(y \mid x)$ on the training data, and then invert the estimated CDF
+		on a fixed $t$-grid to obtain
+		\[
+		\hat{q}_\tau(x) = \inf\{y : \hat{F}(y \mid x) \ge \tau\}.
+		\]
+		\item[QR (quantile-first).] We fit linear quantile regression at level $\tau$
+		directly using degree-3 polynomial features
+		\[
+		\phi(x) = (1, x, x^2, x^3)^\top
+		\]
+		through \texttt{statsmodels.QuantReg}.
+	\end{description}
+	
+	\subsection{One-sided bounds and target coverage}
+	
+	For $\tau \in \{0.05, 0.95\}$, we consider the lower and upper one-sided quantile bounds:
+	\begin{align*}
+		\text{Lower bound:}\quad & L(x) = \hat{q}_{0.05}(x),
+		\qquad \text{target } P(Y \ge L(X)) \approx 0.95, \\
+		\text{Upper bound:}\quad & U(x) = \hat{q}_{0.95}(x),
+		\qquad \text{target } P(Y \le U(X)) \approx 0.95.
+	\end{align*}
+	
+	Thus, the lower-tail problem focuses on estimating the $0.05$ quantile accurately,
+	while the upper-tail problem focuses on the $0.95$ quantile.
+	
+	\subsection{Evaluation metrics}
+	
+	\begin{description}
+		\item[Empirical coverage.] For the lower bound, we report
+		$\hat{P}(Y \ge \hat{q}_{0.05}(X))$; for the upper bound, we report
+		$\hat{P}(Y \le \hat{q}_{0.95}(X))$, both evaluated on the test set.
+		\item[Pinball loss.] For a quantile estimate $q$ at level $\tau$, the pinball loss is
+		\[
+		\rho_\tau(y, q)
+		= (y-q)\bigl[\tau \mathbf{1}_{y \ge q} + (\tau-1)\mathbf{1}_{y<q}\bigr],
+		\]
+		averaged over test points.
+		\item[Mean absolute quantile error.]
+		\[
+		\overline{|e|}
+		= \frac{1}{n_{\mathrm{test}}}
+		\sum_{i=1}^{n_{\mathrm{test}}}
+		\bigl|\hat{q}_\tau(x_i) - q_\tau^*(x_i)\bigr|,
+		\]
+		where $q_\tau^*(x)$ denotes the Monte Carlo oracle quantile.
+		\item[Sup absolute quantile error.]
+		\[
+		\sup_i \bigl|\hat{q}_\tau(x_i)-q_\tau^*(x_i)\bigr|.
+		\]
+	\end{description}
+	
+	% ===========================================================================
+	\section{Experiment 1: CKME vs.\ QR Comparison}
+	% ===========================================================================
+	
+	\subsection{Settings}
+	
+	\begin{center}
+		\begin{tabular}{ll}
+			\toprule
+			Parameter & Value \\
+			\midrule
+			Training sites & $n_{\mathrm{train}} = 1000$ \\
+			Replications per site & $r_{\mathrm{train}} = 1$ (i.i.d.) \\
+			Test points & $n_{\mathrm{test}} = 1000$ (uniform grid) \\
+			$t$-grid size & 500 \\
+			QR polynomial degree & 3 \\
+			Monte Carlo samples for true quantiles & 10{,}000 per $x$ \\
+			Macroreplications & 5 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\subsection{Simulators}
+	
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Name & True function & Noise \\
+			\midrule
+			\texttt{exp1}
+			& $f(x)=1.5x^2/(1-x)$,\quad $x\in[0.1,0.9]$
+			& Heteroscedastic Gaussian \\
+			\texttt{exp2}
+			& $f(x)=x+\sin(\pi x)$,\quad $x\in[0,2\pi]$
+			& Heteroscedastic Gaussian \\
+			\texttt{nongauss\_B2L}
+			& $f(x)=e^{x/10}\sin(x)$,\quad $x\in[0,2\pi]$
+			& Centered Gamma ($k=2$, strongly skewed) \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	For CKME, hyperparameters are loaded from \texttt{pretrained\_params.json}
+	using prior CV tuning:
+	\[
+	\texttt{exp1}: (\ell_x,\lambda,h)=(0.1,0.001,0.1),\qquad
+	\texttt{exp2}: (0.5,0.001,0.1),\qquad
+	\texttt{nongauss\_B2L}: (0.5,0.001,0.1).
+	\]
+	
+	\subsection{Mean absolute quantile error (averaged over 5 macroreplications)}
+	
+	\begin{table}[h]
+		\centering
+		\caption{Mean and sup absolute quantile error over the test grid.
+			Boldface indicates the smaller mean error within each simulator and tail level.}
+		\begin{tabular}{llcccc}
+			\toprule
+			& & \multicolumn{2}{c}{$\tau=0.05$ (lower)} &
+			\multicolumn{2}{c}{$\tau=0.95$ (upper)} \\
+			\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+			Simulator & Method & Mean $|\hat{q}-q^*|$ & Sup $|\hat{q}-q^*|$ &
+			Mean $|\hat{q}-q^*|$ & Sup $|\hat{q}-q^*|$ \\
+			\midrule
+			\multirow{2}{*}{\texttt{exp1}}
+			& CKME & $0.145$ & $0.93$  & $\mathbf{0.653}$ & $30.00$ \\
+			& QR   & $\mathbf{0.083}$ & $2.19$ & $0.667$ & $\mathbf{7.70}$ \\
+			\midrule
+			\multirow{2}{*}{\texttt{exp2}}
+			& CKME & $0.148$ & $0.46$  & $0.278$ & $4.16$ \\
+			& QR   & $\mathbf{0.104}$ & $0.89$ & $\mathbf{0.114}$ & $\mathbf{0.75}$ \\
+			\midrule
+			\multirow{2}{*}{\texttt{nongauss\_B2L}}
+			& CKME & $0.150$ & $0.33$  & $0.233$ & $4.35$ \\
+			& QR   & $\mathbf{0.099}$ & $0.87$ & $\mathbf{0.103}$ & $\mathbf{0.80}$ \\
+			\bottomrule
+		\end{tabular}
+	\end{table}
+	
+	\begin{figure}[!htbp]
+		\centering
+		\includegraphics[width=0.85\textwidth]{onesided_mean_error_boxplot.png}
+		\caption{Mean absolute quantile error $\overline{|\hat{q}_\tau-q_\tau^*|}$ across 5 macroreplications.
+			Left: $\tau=0.05$ (lower bound). Right: $\tau=0.95$ (upper bound).}
+		\label{fig:mean_error}
+	\end{figure}
+	
+	\begin{figure}[!htbp]
+		\centering
+		\includegraphics[width=0.85\textwidth]{onesided_sup_error_boxplot.png}
+		\caption{Sup absolute quantile error $\sup_i |\hat{q}_\tau(x_i)-q_\tau^*(x_i)|$ across 5 macroreplications.
+			The particularly large CKME sup error at $\tau=0.95$ for \texttt{exp1} (around $30$)
+			indicates a severe local failure at a small set of $x$ values.}
+		\label{fig:sup_error}
+	\end{figure}
+	
+	\paragraph{Key observations.}
+	First, QR attains smaller mean quantile error than CKME for all three simulators at
+	$\tau=0.05$. Second, for $\tau=0.95$, QR remains clearly better on \texttt{exp2}
+	and \texttt{nongauss\_B2L}, whereas on \texttt{exp1} the two methods are similar in
+	\emph{mean} error but differ sharply in \emph{worst-case} behavior: CKME has a sup
+	error around $30$, compared with $7.7$ for QR. This indicates that the average
+	performance of CKME at the upper tail can mask catastrophic failure at a few specific
+	test locations.
+	
+	A second pattern is a clear tail asymmetry for CKME. Across all simulators, its sup
+	error is substantially larger for $\tau=0.95$ than for $\tau=0.05$, whereas QR is
+	much more balanced across the two tails. This suggests that the main weakness of CKME
+	in this setting is concentrated in upper-tail quantile estimation rather than being a
+	uniform issue over the full distribution.
+	
+	% ===========================================================================
+	\section{Experiment 2: CKME Scaling Study}
+	% ===========================================================================
+	
+	\subsection{Settings}
+	
+	\begin{center}
+		\begin{tabular}{ll}
+			\toprule
+			Parameter & Value \\
+			\midrule
+			Simulators & \texttt{exp1}, \texttt{exp2}, \texttt{nongauss\_A1L} \\
+			$n_{\mathrm{train}}$ & $\{100,200,500,1000,2000\}$ \\
+			$r_{\mathrm{train}}$ & $1$ (one observation per site, i.i.d.) \\
+			$n_{\mathrm{test}}$ & 500 (uniform grid) \\
+			$t$-grid size & 500 \\
+			Monte Carlo samples for true quantiles & 10{,}000 per $x$ \\
+			Macroreplications & 10 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	Here \texttt{nongauss\_A1L} uses
+	\[
+	f(x)=e^{x/10}\sin(x), \qquad x\in[0,2\pi],
+	\]
+	with Student-$t$ noise ($\nu=3$), producing a heavy-tailed conditional distribution.
+	
+	\subsection{Mean absolute quantile error vs.\ $n_{\mathrm{train}}$}
+	
+	The values below are $\overline{|e|}$ averaged over 10 macroreplications.
+	
+	\subsubsection{$\tau = 0.05$ (lower bound)}
+	\begin{center}
+		\begin{tabular}{lccccc}
+			\toprule
+			Simulator & $n=100$ & $n=200$ & $n=500$ & $n=1000$ & $n=2000$ \\
+			\midrule
+			\texttt{exp1}          & 0.401 & 0.341 & 0.253 & 0.217 & 0.182 \\
+			\texttt{exp2}          & 0.443 & 0.362 & 0.267 & 0.220 & 0.175 \\
+			\texttt{nongauss\_A1L} & 0.331 & 0.294 & 0.217 & 0.171 & 0.148 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\subsubsection{$\tau = 0.95$ (upper bound)}
+	\begin{center}
+		\begin{tabular}{lccccc}
+			\toprule
+			Simulator & $n=100$ & $n=200$ & $n=500$ & $n=1000$ & $n=2000$ \\
+			\midrule
+			\texttt{exp1}          & 0.730 & 0.686 & 0.654 & 0.655 & 0.663 \\
+			\texttt{exp2}          & 0.428 & 0.370 & 0.304 & 0.273 & 0.264 \\
+			\texttt{nongauss\_A1L} & 0.326 & 0.332 & 0.292 & 0.280 & 0.292 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\subsection{Sup error vs.\ $n_{\mathrm{train}}$ for $\tau=0.95$}
+	
+	\begin{center}
+		\begin{tabular}{lccccc}
+			\toprule
+			Simulator & $n=100$ & $n=200$ & $n=500$ & $n=1000$ & $n=2000$ \\
+			\midrule
+			\texttt{exp1}          & 13.8 & 15.9 & 20.5 & 23.5 & 27.2 \\
+			\texttt{exp2}          & 2.09 & 1.94 & 2.10 & 2.34 & 3.09 \\
+			\texttt{nongauss\_A1L} & 1.55 & 2.19 & 3.20 & 4.57 & 5.94 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=\textwidth]{onesided_tailprob_fixed_t_agg.png}
+		\caption{Estimated tail probability $\hat{F}(t \mid x)$ at a fixed threshold $t$,
+			aggregated across macroreplications. Deviations from the oracle curve indicate
+			systematic bias in CKME's estimated upper tail.}
+		\label{fig:tailprob_agg}
+	\end{figure}
+	
+	\subsection{Diagnostic summary}
+	
+	Three diagnostics were run using \texttt{diag\_ckme\_scaling.py}.
+	
+	\paragraph{Diag~1 (worst-case location $x^*$).}
+	For $\tau=0.05$, the worst-case location
+	\[
+	x^*=\arg\max_x |\hat{q}_\tau(x)-q_\tau^*(x)|
+	\]
+	is spread across the domain and gradually contracts as $n$ increases.
+	For $\tau=0.95$, however, $x^*$ consistently concentrates near the right boundary
+	$x=2\pi$, indicating that the upper-tail failure is not diffuse but localized in a
+	specific region.
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=\textwidth]{diag_worst_x.png}
+		\caption{Diag~1: distribution of worst-case locations
+			$x^*=\arg\max_x |\hat{q}_\tau(x)-q_\tau^*(x)|$ across macroreplications, for each
+			$n_{\mathrm{train}}$. Top: $\tau=0.05$. Bottom: $\tau=0.95$.}
+		\label{fig:diag_worst_x}
+	\end{figure}
+	
+	\paragraph{Diag~4 (error percentiles).}
+	For $\tau=0.05$, the mean, 95th percentile, and sup errors all decrease with
+	$n_{\mathrm{train}}$, indicating standard convergence behavior.
+	
+	For $\tau=0.95$, the behavior is more heterogeneous:
+	\begin{itemize}
+		\item For \texttt{exp2} and \texttt{nongauss\_A1L}, the 95th percentile error stays
+		close to the mean error, suggesting that most test points improve with larger
+		$n$, and that the growing sup error is driven by a small number of outlying
+		$x$ values.
+		\item For \texttt{exp1}, the pattern is much more anomalous: the mean error remains
+		nearly flat at about $0.66$, while the sup error increases steadily from $13.8$
+		at $n=100$ to $27.2$ at $n=2000$. In other words, adding more data does not
+		improve upper-tail accuracy and in fact worsens the worst-case error.
+	\end{itemize}
+	
+	\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=\textwidth]{diag_q95err.png}
+		\caption{Diag~4: mean, 95th percentile, and sup error of
+			$|\hat{q}_{0.95}(x)-q_{0.95}^*(x)|$ versus $n_{\mathrm{train}}$.
+			For \texttt{exp1}, the increasing sup error confirms anomalous upper-tail divergence.}
+		\label{fig:diag_q95err}
+	\end{figure}
+	
+	% ===========================================================================
+	\section{Discussion}
+	% ===========================================================================
+	
+	\subsection{Upper-tail failure of CKME}
+	
+	The main finding is a pronounced asymmetry between the lower and upper tails for CKME.
+	
+	For the lower tail ($\tau=0.05$), CKME shows regular convergence in mean error as
+	$n_{\mathrm{train}}$ increases. Although it is somewhat conservative from a coverage
+	perspective, its estimation behavior is broadly stable.
+	
+	For the upper tail ($\tau=0.95$), the picture is very different. On \texttt{exp1},
+	the mean error does not meaningfully decrease with $n$, and the sup error increases
+	substantially. On the other simulators, the upper-tail mean error does improve, but
+	much more slowly than in the lower tail, and the worst-case error still grows.
+	
+	This pattern suggests that the CKME difficulty is not simply due to finite-sample
+	noise. Rather, the issue appears structural and is concentrated in the upper tail,
+	especially near certain boundary regions.
+	
+	\subsection{A plausible explanation}
+	
+	The diagnostics suggest that the problem is not caused by an insufficiently wide
+	$t$-grid. Instead, a more plausible explanation is that the smooth-indicator CKME
+	approximation allocates its fitting effort too uniformly over $t$ and therefore does
+	not represent extreme upper-tail behavior accurately enough.
+	
+	In particular, if $\hat{F}(y \mid x)$ grows too slowly near high probability levels,
+	then the inversion
+	\[
+	\hat{q}_{0.95}(x)=\inf\{y:\hat{F}(y\mid x)\ge 0.95\}
+	\]
+	will be shifted upward relative to the oracle quantile. This leads to overly large
+	upper bounds, inflated one-sided coverage, and large quantile estimation error.
+	With more data, the central part of the conditional CDF may improve, while the tail
+	region remains poorly captured or even becomes relatively more distorted under the
+	global fitting criterion.
+	
+	\subsection{Why QR performs better here}
+	
+	Linear polynomial QR directly optimizes the pinball loss at the target quantile level,
+	so it is tuned specifically for the quantity being evaluated. By contrast, CKME is
+	estimated through a full-CDF objective, which spreads fitting effort across the
+	entire distribution rather than prioritizing a single tail quantile.
+	
+	For the Gaussian examples \texttt{exp1} and \texttt{exp2}, the degree-3 QR model is
+	also reasonably well specified or only mildly misspecified. In that setting, there is
+	little reason to expect a full-distribution method to outperform a model that targets
+	the quantile directly. The non-Gaussian example \texttt{nongauss\_B2L} still favors
+	QR, which suggests that, at least in the current implementation, CKME's flexibility
+	does not translate into better plug-in one-sided quantile estimation.
+	
+	\subsection{Implications for the paper}
+	
+	At the plug-in estimation level, without conformal calibration, the current evidence
+	supports the following conclusions.
+	
+	First, QR generally provides more accurate one-sided quantile estimates and lower
+	tail-specific loss. Second, CKME tends to be more conservative, especially for upper
+	quantiles, because its estimated conditional distribution can be overly spread in the
+	relevant tail region. Third, the main value of CKME is therefore unlikely to be raw
+	plug-in quantile accuracy. Its real advantage lies in representing the full
+	conditional law, which is useful for downstream tasks such as conformal calibration,
+	distributional scoring, and adaptive data collection in the two-stage pipeline.
+	
+	This suggests an important framing choice for the paper: CKME should not be presented
+	as a universally better plug-in quantile estimator than QR. Instead, it is better
+	motivated as a full-distribution model whose strength appears after conformalization
+	or within broader distributional decision pipelines.
+	
+\end{document}

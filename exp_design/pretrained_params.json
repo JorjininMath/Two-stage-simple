@@ -1,0 +1,32 @@
+{
+  "exp2_gauss_low": {
+    "ell_x": 0.2,
+    "lam": 1e-05,
+    "h": 0.05
+  },
+  "exp2_gauss_high": {
+    "ell_x": 0.5,
+    "lam": 1e-05,
+    "h": 0.05
+  },
+  "nongauss_A1S": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_A1L": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_A1S_raw": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_A1L_raw": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  }
+}

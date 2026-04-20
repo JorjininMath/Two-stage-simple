@@ -1,0 +1,15 @@
+# exp_returns: CKME + split CP on Kenneth French daily stock returns.
+# X = lagged 22-day realized volatility; Y = daily market return (MktRF + RF).
+# 5 rolling-window rounds mirroring Chernozhukov et al. (2021) replication.
+
+alpha        = 0.1
+t_grid_size  = 500
+n_rounds     = 5
+holdout_frac = 0.10
+split_ratio  = 0.5
+n_bins       = 20
+
+# Default CKME params (overridden by pretrained_params.json if present)
+ell_x = 1.0
+lam   = 1e-2
+h     = 1.0

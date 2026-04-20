@@ -1,0 +1,15 @@
+# exp_branin: Branin-Hoo (2D) with Gaussian and Student-t noise.
+# simulator_func is overridden per-case in run_branin_compare.py.
+simulator_func = branin_gauss
+n_0 = 2000
+r_0 = 10
+n_1 = 500
+r_1 = 5
+n_test = 500
+r_test = 1
+n_cand = 2000
+t_grid_size = 500
+ell_x = 3.0
+lam = 1e-2
+h = 0.3
+alpha = 0.1

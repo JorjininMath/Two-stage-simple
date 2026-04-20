@@ -162,12 +162,10 @@ def plot_analysis(out_dir: Path, save_path: Path, fixed_dir: Path | None = None,
     ref = _load_reference_data(out_dir=fdir)
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-    x_fine = np.linspace(-3, 3, 300)
 
     for col, sim in enumerate(SIMULATORS):
         ax_cov = axes[0, col]
         ax_wid = axes[1, col]
-        sigma_func = _SIGMA_FUNC[sim]
         sim_idx = col + 1   # 1 or 2
 
         # --- Load local coverage (from adaptive dir first, fallback to fixed) ---
@@ -184,9 +182,6 @@ def plot_analysis(out_dir: Path, save_path: Path, fixed_dir: Path | None = None,
 
         # --- Load width profiles ---
         wp = _load_width_profile(fdir, sim, n_macro_max=n_macro_max)
-
-        # --- Oracle σ(x) ---
-        sigma_fine = sigma_func(x_fine)
 
         # ---- Panel 1: local coverage ----
         ax_cov.axhline(1 - ALPHA, color="gray", linestyle="--", linewidth=1.2,
@@ -262,18 +257,7 @@ def plot_analysis(out_dir: Path, save_path: Path, fixed_dir: Path | None = None,
                             color="navy",
                             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="navy", alpha=0.8))
 
-        # σ(x) on right axis
-        ax_r1 = ax_cov.twinx()
-        ax_r1.plot(x_fine, sigma_fine, color="#d62728", linewidth=1.0,
-                   linestyle=":", alpha=0.6, label=r"oracle $\sigma(x)$")
-        ax_r1.set_ylabel(r"oracle $\sigma(x)$", color="#d62728", fontsize=9)
-        ax_r1.tick_params(axis="y", colors="#d62728", labelsize=8)
-        ax_r1.set_ylim(bottom=0)
-
-        lines1, labs1 = ax_cov.get_legend_handles_labels()
-        lines2, labs2 = ax_r1.get_legend_handles_labels()
-        ax_cov.legend(lines1 + lines2, labs1 + labs2, fontsize=7.5, loc="lower center",
-                      ncol=2, framealpha=0.85)
+        ax_cov.legend(fontsize=7.5, loc="lower center", ncol=2, framealpha=0.85)
 
         # ---- Panel 2: width profile ----
         if rlcp is not None:
@@ -308,16 +292,7 @@ def plot_analysis(out_dir: Path, save_path: Path, fixed_dir: Path | None = None,
         ax_wid.set_title(f"{SIM_LABELS[sim]} — width profile", fontsize=11)
         ax_wid.grid(True, alpha=0.25)
 
-        ax_r2 = ax_wid.twinx()
-        ax_r2.plot(x_fine, sigma_fine, color="#d62728", linewidth=1.0,
-                   linestyle=":", alpha=0.6, label=r"oracle $\sigma(x)$")
-        ax_r2.set_ylabel(r"oracle $\sigma(x)$", color="#d62728", fontsize=9)
-        ax_r2.tick_params(axis="y", colors="#d62728", labelsize=8)
-        ax_r2.set_ylim(bottom=0)
-
-        lines3, labs3 = ax_wid.get_legend_handles_labels()
-        lines4, labs4 = ax_r2.get_legend_handles_labels()
-        ax_wid.legend(lines3 + lines4, labs3 + labs4, fontsize=8, loc="upper right")
+        ax_wid.legend(fontsize=8, loc="upper right")
 
     fig.suptitle("CKME-CP: Local Coverage & Width  (radius=0.4)",
                  fontsize=12, y=1.01)

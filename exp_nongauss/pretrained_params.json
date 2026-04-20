@@ -1,0 +1,32 @@
+{
+  "nongauss_A1S": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_B2S": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_C1S": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_A1L": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_B2L": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  },
+  "nongauss_C1L": {
+    "ell_x": 0.5,
+    "lam": 0.001,
+    "h": 0.1
+  }
+}

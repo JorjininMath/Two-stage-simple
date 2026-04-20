@@ -1,0 +1,16 @@
+# One-sided quantile comparison: CKME vs linear QR (plug-in, no calibration)
+# Simulators: exp1 (Gaussian), exp2_test (bimodal mixture), nongauss_B2L (Gamma skew)
+
+n_train = 500
+n_test = 1000
+t_grid_size = 500
+poly_degree = 3
+tau_lo = 0.1
+tau_hi = 0.9
+n_macro = 1
+base_seed = 42
+
+# CKME fixed hyperparameters
+ell_x = 0.5
+lam = 0.001
+h = 0.1
