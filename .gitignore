@@ -6,6 +6,10 @@ EXPERIMENTS.md
 MEMORY.md
 subagent.md
 
+# Personal research notes and dissertation materials (local only)
+notes/
+dissertation_use/
+
 # Claude Code local config
 .claude/
 

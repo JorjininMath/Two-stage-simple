@@ -6,7 +6,7 @@
 # Usage: Rscript run_benchmarks_one_case.R <data_dir> <output_csv> <alpha> <n_grid>
 #############################################################################
 
-# library(hetGP)  # commented out — hetGP disabled for now
+library(hetGP)
 library(quantreg)
 
 # Project root = directory containing this script
@@ -73,11 +73,37 @@ run_benchmarks_one_case <- function(dat, alpha = 0.1, n_grid = 500) {
     (2 / alpha) * pmax(0, L_qr - Y_test) +
     (2 / alpha) * pmax(0, Y_test - U_qr)
 
-  # --- hetGP disabled for now ---
+  # --- hetGP ---
   hetgp_L <- hetgp_U <- hetgp_width <- rep(NA_real_, n_test)
   hetgp_covered <- rep(NA_integer_, n_test)
   hetgp_interval_score <- rep(NA_real_, n_test)
   hetgp_covered_score <- rep(NA_integer_, n_test)
+  tryCatch({
+    X_train <- rbind(X0, X1)
+    Y_train <- c(Y0, Y1)
+    reps <- find_reps(X_train, Y_train)
+    hetgp_model <- mleHetGP(
+      X = list(X0 = reps$X0, Z0 = reps$Z0, mult = reps$mult),
+      Z = reps$Z,
+      lower = rep(0.01, ncol(X0)),
+      upper = rep(10, ncol(X0)),
+      covtype = "Gaussian",
+      noiseControl = list(g_min = 1e-4, g_bounds = c(1e-4, 100))
+    )
+    pred_hetgp <- predict(hetgp_model, X_test)
+    z_alpha <- qnorm(1 - alpha_sig / 2)
+    total_var <- pred_hetgp$sd2 + pred_hetgp$nugs
+    hetgp_L <- pred_hetgp$mean - z_alpha * sqrt(total_var)
+    hetgp_U <- pred_hetgp$mean + z_alpha * sqrt(total_var)
+    hetgp_width <- hetgp_U - hetgp_L
+    hetgp_covered <- as.integer((Y_test >= hetgp_L) & (Y_test <= hetgp_U))
+    hetgp_covered_score <- hetgp_covered
+    hetgp_interval_score <- hetgp_width +
+      (2 / alpha) * pmax(0, hetgp_L - Y_test) +
+      (2 / alpha) * pmax(0, Y_test - hetgp_U)
+  }, error = function(e) {
+    warning(sprintf("hetGP failed: %s", conditionMessage(e)))
+  })
 
   data.frame(
     L_dr                = L_dr,
