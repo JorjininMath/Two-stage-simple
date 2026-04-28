@@ -12,7 +12,7 @@ This module provides a clean interface for the first step of the two-stage pipel
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -22,10 +22,12 @@ from CKME.parameters import ParamGrid, Params
 from .data_collection import collect_stage1_data
 from .sim_functions import get_experiment_config
 
-if TYPE_CHECKING:
-    pass  # Params used for type hints
-
 ArrayLike = np.ndarray
+
+# t_grid construction: clip heavy-tail outliers then add a symmetric margin
+_T_GRID_LO_PCT: float = 0.5    # lower percentile of Y for range estimation
+_T_GRID_HI_PCT: float = 99.5   # upper percentile of Y for range estimation
+_T_GRID_MARGIN: float = 0.10   # fractional margin beyond the clipped range
 
 
 @dataclass
@@ -60,7 +62,7 @@ class Stage1TrainResult:
     X_all: np.ndarray
     Y_all: np.ndarray
     X_0: np.ndarray
-    params: "Params"
+    params: Params
     n_0: int
     r_0: int
     d: int
@@ -153,9 +155,9 @@ def run_stage1_train(
 
     # Use percentile-based bounds to prevent heavy-tail outliers from dominating
     # the t_grid and causing CDF inversion to clip at the boundary for high τ.
-    Y_lo = np.percentile(Y_all, 0.5)
-    Y_hi = np.percentile(Y_all, 99.5)
-    y_margin = 0.10 * (Y_hi - Y_lo)
+    Y_lo = np.percentile(Y_all, _T_GRID_LO_PCT)
+    Y_hi = np.percentile(Y_all, _T_GRID_HI_PCT)
+    y_margin = _T_GRID_MARGIN * (Y_hi - Y_lo)
     t_grid = np.linspace(Y_lo - y_margin, Y_hi + y_margin, t_grid_size)
 
     if verbose:

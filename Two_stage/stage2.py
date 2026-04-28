@@ -10,7 +10,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Literal, Optional, Tuple, Union
+
+if TYPE_CHECKING:
+    from CKME import CKMEModel
+    from CP.cp import CP
 
 import numpy as np
 
@@ -54,12 +58,12 @@ class Stage2Result:
         Significance level.
     """
 
-    model: object  # CKMEModel
+    model: "CKMEModel"
     t_grid: np.ndarray
     X_1: np.ndarray
     X_stage2: np.ndarray
     Y_stage2: np.ndarray
-    cp: object  # CP
+    cp: "CP"
     n_1: int
     r_1: int
     selection_method: str
@@ -111,6 +115,9 @@ def run_stage2(
         Random seed.
     verbose : bool, default=False
         Print progress.
+    s0_score_type : str, default="tail"
+        S⁰ score variant: "tail" (quantile interval width) or "epistemic"
+        (bootstrap variance of CDF estimate).
 
     Returns
     -------

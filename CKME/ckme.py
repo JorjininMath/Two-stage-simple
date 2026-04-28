@@ -219,13 +219,6 @@ class CKMEModel:
             self.Y = Y
             self.n, self.d = X.shape
 
-        # OLD (full n_0*r_0 approach — kept for reference):
-        # self.X = X               # (n_0*r_0, d)
-        # self.Y = Y               # (n_0*r_0,)
-        # self.n, self.d = X.shape
-        # self.K_X = self.kx(self.X, self.X)  # (n_0*r_0)^2
-        # self.L = build_cholesky_factor(self.K_X, self.n, params.lam)
-
         # Build (K_X + n*lam*I) and its Cholesky factor in a single (n, n)
         # buffer — avoids materializing K_X separately. For large n this
         # cuts peak training memory roughly 4x. dtype=float32 halves it again.
@@ -305,8 +298,6 @@ class CKMEModel:
         if self.r > 1:
             # Distinct-sites mode: G_bar[j, m] = mean_k g_{t_m}(Y[j, k])
             # self.Y has shape (n_sites, r); compute per-site empirical CDF values
-            # OLD (full-data path):
-            # F = compute_cdf_from_coeffs(C, self.Y.ravel(), self.indicator, t_grid, clip=clip)
             Y_flat = self.Y.ravel()                               # (n_sites * r,)
             G_all  = self.indicator.g_matrix(Y_flat, t_grid)     # (n_sites * r, M)
             G_bar  = G_all.reshape(self.n, self.r, -1).mean(axis=1)  # (n_sites, M)

@@ -92,7 +92,7 @@ class TuningResults:
     best_params: Params
     best_loss: float
     cv_results: List[CVResult] = field(default_factory=list)
-    param_grid: ParamGrid = None
+    param_grid: Optional[ParamGrid] = None
     cv_folds: int = 5
     n_params_tested: int = 0
 
@@ -205,11 +205,6 @@ def _evaluate_params_cv(
             (X_train_fold, Y_train_fold, X_val_fold, Y_val_fold)
         )
 
-    # ========================================================================
-    # DIAGNOSTIC MODIFICATION: Evaluate folds and collect both train and val loss
-    # This modification is for Step 3 overfitting detection.
-    # May be reverted later if train_loss is not needed.
-    # ========================================================================
     # Evaluate all folds (parallel or sequential)
     if n_jobs > 1 and HAS_JOBLIB:
         # Parallel evaluation
