@@ -1,0 +1,20 @@
+# exp_wsc: WSC 2026 paper experiments (Tables 2-3).
+#
+# Stage 1 budget: n_0 * r_0 = 500 * 10 = 5000 (fixed).
+# Stage 2 budget: swept in run_wsc_compare.py over
+#   (n_1, r_1) in {(100, 50), (200, 25), (500, 10)}.
+# DGPs: wsc_gauss (Exp 1, Gaussian) and nongauss_A1L (Exp 2, Student-t nu=3).
+# Methods: lhs, sampling, mixed (rho=0.7).
+
+n_0         = 500
+r_0         = 10
+n_test      = 1000
+r_test      = 1
+n_cand      = 2000
+t_grid_size = 500
+alpha       = 0.1
+
+# Fallback CKME hyperparameters (overridden by pretrained_params.json if present).
+ell_x = 1.0
+lam   = 1e-2
+h     = 0.1

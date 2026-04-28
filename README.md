@@ -113,6 +113,23 @@ python exp_gibbs_compare/plot_gibbs_compare.py \
     --output_dir exp_gibbs_compare/output_adaptive_c2.0
 ```
 
+### Experiment 1b — WSC 2026 Paper (`exp_wsc/`)
+
+Reproduces **Tables 2–3** of the WSC 2026 paper. Two 1D DGPs (Gaussian and Student-t ν=3, same heteroscedastic σ(x)); Stage 2 budget sweep over (n₁,r₁) ∈ {(100,50),(200,25),(500,10)}; three site-selection methods; 50 macroreps.
+
+```bash
+# Pretune hyperparameters (run once)
+python exp_wsc/pretrain_params.py
+
+# Full run (50 macroreps, parallel)
+python exp_wsc/run_wsc_compare.py --n_macro 50 --n_workers 8
+
+# Print Tables 2-3
+python exp_wsc/make_tables.py
+```
+
+See [`exp_wsc/README.md`](exp_wsc/README.md) for full details.
+
 ### Experiment 2 — Non-Gaussian Noise (`exp_nongauss/`)
 
 Six simulators (Student-t / Gamma / Gaussian-mixture, small/large non-Gaussianity). Compares CKME-CP against DCP-DR and hetGP.

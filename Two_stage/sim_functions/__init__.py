@@ -105,6 +105,11 @@ _EXPERIMENT_REGISTRY = {
                         "bounds": EXP2_GAUSS_X_BOUNDS, "d": 1},
     "exp2_gauss_high": {"simulator": make_exp2_gauss_simulator(**EXP2_GAUSS_HIGH_PARAMS),
                         "bounds": EXP2_GAUSS_X_BOUNDS, "d": 1},
+    # WSC 2026 paper DGPs: sigma(x) = 0.01 + 0.2*(x-pi)^2
+    # wsc_gauss: Exp 1 (Gaussian noise)
+    # nongauss_A1L: Exp 2 (Student-t nu=3) — registered above
+    "wsc_gauss": {"simulator": make_exp2_gauss_simulator(sigma_base=0.01, sigma_slope=0.20),
+                  "bounds": EXP2_GAUSS_X_BOUNDS, "d": 1},
 }
 
 
