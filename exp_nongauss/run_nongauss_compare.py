@@ -2,7 +2,7 @@
 exp_nongauss: Compare CKME, DCP-DR, hetGP on six non-Gaussian noise DGPs.
 
 All six cases share the exp2 true function f(x) = exp(x/10)*sin(x), x in [0, 2*pi]
-and target variance sigma_tar(x)^2, sigma_tar(x) = 0.1 + 0.1*(x-pi)^2.
+and target scale sigma_tar(x), sigma_tar(x) = 0.01 + 0.2*(x-pi)^2.
 
   Small (light non-Gaussianity):
     nongauss_A1S : Student-t,      nu=10  (light tails)
@@ -62,8 +62,8 @@ _PI = np.pi
 
 
 def _nongauss_oracle_var(x: np.ndarray) -> np.ndarray:
-    """Oracle conditional variance for all nongauss sims: sigma_tar(x)^2."""
-    return (0.1 + 0.1 * (x - _PI) ** 2) ** 2
+    """Oracle scale^2 for all nongauss sims (matches sim_nongauss_A1._sigma_tar)."""
+    return (0.01 + 0.2 * (x - _PI) ** 2) ** 2
 
 
 def _adaptive_h_vals(model, x_query: np.ndarray, c_scale: float) -> np.ndarray:
