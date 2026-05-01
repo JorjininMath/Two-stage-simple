@@ -175,6 +175,35 @@ python exp_onesided/exp2_quantile_error.py --n_macro 50
 python exp_onesided/exp2_sup_vs_tau.py
 ```
 
+### Experiment 6 — Adaptive Bandwidth $h(x)$ (`exp_adaptive_h/`)
+
+Validates the **score-homogeneity** property of CKME-CP under adaptive bandwidth $h(x) = c \cdot \hat{\sigma}(x)$. Four sub-experiments:
+
+- **exp1** — baseline coverage/width across simulators (fixed $h$ from CV)
+- **exp2** — oracle $h(x)$ sweep, paired with fixed $h$
+- **exp3** — sensitivity to the scaling constant $c$
+- **exp4** — three-arm comparison: fixed / plug-in $\hat{\sigma}(x)$ / oracle $h(x)$, validating the **Gap Theorem** (decay of $|\mathrm{cov}_\text{plug} - \mathrm{cov}_\text{oracle}|$ with budget) on Gaussian DGPs and the score-homogeneity prediction on Student-t$_3$
+
+```bash
+python exp_adaptive_h/pretrain_params.py
+python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
+python exp_adaptive_h/summarize_exp4.py
+python exp_adaptive_h/plot_exp4a.py    # Gap Theorem decay (Gaussian DGPs)
+python exp_adaptive_h/plot_exp4b.py    # Coverage equivalence + h-ratio diagnostic (Student-t)
+```
+
+See [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md) for the full plan.
+
+---
+
+## Manuscript
+
+Paper-level writeup assets (per-experiment `.tex` reports, shared header, sections) live in [`manuscript/`](manuscript/). Auto-generated tables (e.g. `exp_adaptive_h/output_exp4/exp4_table.tex`) stay in their experiment output directories and are referenced via `\input{...}`; figures are pulled via `\graphicspath{{../../exp_*/output/}}`.
+
+```bash
+cd manuscript/reports && pdflatex nongauss_report.tex
+```
+
 ---
 
 ## Project Structure
@@ -219,10 +248,15 @@ Two-stage-simple/
 │       └── sim_gibbs_s2.py      # Gibbs Setting 2: σ(x) = 2φ(x/1.5)
 │
 ├── exp_gibbs_compare/           # Exp 1: CKME-CP vs RLCP
+├── exp_wsc/                     # Exp 1b: WSC 2026 paper reproduction
 ├── exp_nongauss/                # Exp 2: Non-Gaussian noise
 ├── exp_conditional_coverage/    # Exp 3: Coverage consistency
 ├── exp_design/                  # Exp 4: Design comparison
 ├── exp_onesided/                # Exp 5: One-sided quantile
+├── exp_adaptive_h/              # Exp 6: Adaptive bandwidth h(x)
+│
+├── manuscript/                  # Paper-level tex writeup
+│   └── reports/                 # Per-experiment .tex reports
 │
 ├── dcp_r.R                      # R: DCP-DR + hetGP benchmarks
 ├── run_benchmarks_one_case.R    # R: single-case benchmark runner
