@@ -1,0 +1,24 @@
+# exp_adaptive_h: Adaptive bandwidth h(x) experiments (Exp1-4).
+# simulator_func is overridden per-case in the run scripts.
+# DGPs: wsc_gauss, gibbs_s1, exp1, nongauss_A1L (all 1D).
+#
+# Sampling scheme:
+#   Stage 1 (D_0, fits CKME):   grid    (1D, equal-spaced for clean sigma_hat estimation)
+#   Stage 2 (D_1, CP calib):    LHS     (CP exchangeability requires random sampling)
+#   Test (X_test, evaluation):  LHS     (CP exchangeability)
+#
+# c (multiplier in h(x) = c * s(x)) is consumed by the adaptive-h wrapper;
+# default c = 1.0; Exp3 sweeps it.
+simulator_func = wsc_gauss
+n_0 = 100
+r_0 = 10
+n_1 = 100
+r_1 = 10
+n_test = 1000
+r_test = 1
+n_cand = 1000
+t_grid_size = 1000
+ell_x = 1.0
+lam = 1e-2
+h = 0.3
+alpha = 0.1
