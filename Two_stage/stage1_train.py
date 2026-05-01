@@ -82,6 +82,7 @@ def run_stage1_train(
     cv_folds: int = 5,
     n_jobs: int = 1,
     t_grid_size: int = 100,
+    t_grid_margin: Optional[float] = None,
     random_state: Optional[int] = None,
     verbose: bool = False,
     dtype: Optional[type] = None,
@@ -117,6 +118,10 @@ def run_stage1_train(
         Parallel jobs for CV.
     t_grid_size : int, default=100
         Points in threshold grid.
+    t_grid_margin : float, optional
+        Fractional margin beyond [P{LO}, P{HI}] of Y for t_grid bounds.
+        If None, uses module default (0.10). Set larger (e.g. 1.0-2.0) for
+        heavy-tailed DGPs where the right tail extends far beyond P99.5.
     random_state : int, optional
         Random seed.
     verbose : bool, default=False
@@ -157,7 +162,8 @@ def run_stage1_train(
     # the t_grid and causing CDF inversion to clip at the boundary for high τ.
     Y_lo = np.percentile(Y_all, _T_GRID_LO_PCT)
     Y_hi = np.percentile(Y_all, _T_GRID_HI_PCT)
-    y_margin = _T_GRID_MARGIN * (Y_hi - Y_lo)
+    margin_frac = _T_GRID_MARGIN if t_grid_margin is None else float(t_grid_margin)
+    y_margin = margin_frac * (Y_hi - Y_lo)
     t_grid = np.linspace(Y_lo - y_margin, Y_hi + y_margin, t_grid_size)
 
     if verbose:
