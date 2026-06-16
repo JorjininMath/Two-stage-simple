@@ -48,7 +48,6 @@ import matplotlib.pyplot as plt
 
 from Two_stage.sim_functions import get_experiment_config
 
-SIMULATOR = "nongauss_A1L"
 ARMS = ["fixed", "plugin", "oracle"]
 ARM_COLOR = {"fixed": "tab:gray", "plugin": "tab:blue", "oracle": "tab:red"}
 ARM_LS    = {"fixed": "--",       "plugin": "-",        "oracle": "-"}
@@ -66,8 +65,8 @@ def _bin_coverage(x: np.ndarray, cov: np.ndarray, bin_edges: np.ndarray) -> np.n
     return out
 
 
-def _load_arm_curves(out_dir: Path, budget: int, arm: str, bin_edges: np.ndarray):
-    paths = sorted(out_dir.glob(f"macrorep_*/budget_{budget}/case_{SIMULATOR}_{arm}/per_point.csv"))
+def _load_arm_curves(out_dir: Path, simulator: str, budget: int, arm: str, bin_edges: np.ndarray):
+    paths = sorted(out_dir.glob(f"macrorep_*/budget_{budget}/case_{simulator}_{arm}/per_point.csv"))
     if not paths:
         return None
     cov_per = np.empty((len(paths), len(bin_edges) - 1))
@@ -81,15 +80,15 @@ def _load_arm_curves(out_dir: Path, budget: int, arm: str, bin_edges: np.ndarray
     return cov_per, marg
 
 
-def _figure1_coverage(out_dir: Path, paired: pd.DataFrame, n_bins: int, alpha: float):
-    df_sim = paired[paired["simulator"] == SIMULATOR]
+def _figure1_coverage(out_dir: Path, simulator: str, paired: pd.DataFrame, n_bins: int, alpha: float):
+    df_sim = paired[paired["simulator"] == simulator]
     if df_sim.empty:
-        print(f"WARN: no rows for {SIMULATOR} in paired csv; skipping Fig 1", file=sys.stderr)
+        print(f"WARN: no rows for {simulator} in paired csv; skipping Fig 1", file=sys.stderr)
         return
     budgets = sorted(df_sim["budget"].unique())
     B_max = int(budgets[-1])
 
-    cfg = get_experiment_config(SIMULATOR)
+    cfg = get_experiment_config(simulator)
     x_lo = float(cfg["bounds"][0][0])
     x_hi = float(cfg["bounds"][1][0])
     bin_edges = np.linspace(x_lo, x_hi, n_bins + 1)
@@ -99,7 +98,7 @@ def _figure1_coverage(out_dir: Path, paired: pd.DataFrame, n_bins: int, alpha: f
 
     fig, ax = plt.subplots(1, 1, figsize=(9, 6))
     for arm in ARMS:
-        loaded = _load_arm_curves(out_dir, B_max, arm, bin_edges)
+        loaded = _load_arm_curves(out_dir, simulator, B_max, arm, bin_edges)
         if loaded is None:
             continue
         cov_per, marg = loaded
@@ -120,19 +119,19 @@ def _figure1_coverage(out_dir: Path, paired: pd.DataFrame, n_bins: int, alpha: f
     ax.grid(alpha=0.3)
     ax.legend(loc="lower right", fontsize=9)
     ax.set_title(
-        f"Exp4b ({SIMULATOR}, $B={B_max}$): conditional coverage — "
+        f"Exp4b ({simulator}, $B={B_max}$): conditional coverage — "
         f"plug-in vs oracle vs fixed"
     )
     fig.tight_layout()
-    out_path = out_dir / "exp4b_coverage_curves.png"
+    out_path = out_dir / f"exp4b_coverage_curves_{simulator}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"Saved: {out_path}")
 
 
-def _figure2_qhat_ratio(out_dir: Path, paired: pd.DataFrame, c_scale: float):
-    df_sim = paired[paired["simulator"] == SIMULATOR].copy()
+def _figure2_qhat_ratio(out_dir: Path, simulator: str, paired: pd.DataFrame, c_scale: float):
+    df_sim = paired[paired["simulator"] == simulator].copy()
     if df_sim.empty:
-        print(f"WARN: no rows for {SIMULATOR} in paired csv; skipping Fig 2", file=sys.stderr)
+        print(f"WARN: no rows for {simulator} in paired csv; skipping Fig 2", file=sys.stderr)
         return
 
     g = df_sim.groupby("budget", sort=True)
@@ -154,8 +153,16 @@ def _figure2_qhat_ratio(out_dir: Path, paired: pd.DataFrame, c_scale: float):
     agg = pd.DataFrame(rows)
     x = agg["budget"].to_numpy(dtype=float)
 
-    nu = 3.0
-    h_target = float(np.sqrt(nu / (nu - 2)))  # = sqrt(3) for Student-t_3
+    # Population limit of (IQR/1.349) / scale: 1 for Gaussian DGPs;
+    # kappa_nu = (q_{0.75}(t_nu) - q_{0.25}(t_nu)) / 1.349 for Student-t_nu.
+    if simulator == "nongauss_A1L":
+        from scipy.stats import t as _t
+        nu = 3.0
+        h_target = float((_t.ppf(0.75, df=nu) - _t.ppf(0.25, df=nu)) / 1.349)
+        h_target_label = rf"$\kappa_{{\nu={int(nu)}}}\approx{h_target:.3f}$ (asymp.)"
+    else:
+        h_target = 1.0
+        h_target_label = "asymp. ratio = 1 (Gaussian)"
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.5), sharex=True)
 
@@ -178,30 +185,142 @@ def _figure2_qhat_ratio(out_dir: Path, paired: pd.DataFrame, c_scale: float):
                     label="25-75% paired")
     ax.plot(x, agg["med_h"], "o-", color="tab:green", lw=2, ms=7, label="median")
     ax.axhline(1.0, ls=":", color="black", alpha=0.6)
-    ax.axhline(h_target, ls="--", color="tab:orange",
-               label=f"$\\sqrt{{\\nu/(\\nu-2)}}={h_target:.3f}$ (asymp.)")
+    if not np.isclose(h_target, 1.0):
+        ax.axhline(h_target, ls="--", color="tab:orange", label=h_target_label)
     ax.set_xscale("log")
     ax.set_xlabel("Stage 1 budget $B = n_0 \\cdot r_0$")
     ax.set_ylabel(r"$\bar{h}_{\mathrm{plug}}/\bar{h}_{\mathrm{oracle}}$ (mean over $X_\mathrm{test}$)")
-    ax.set_title(r"Diagnostic: bandwidth ratio $\hat{\sigma}/s$ converges to $\sqrt{\nu/(\nu-2)}$")
+    ax.set_title(r"Diagnostic: bandwidth ratio $\hat{\sigma}/s$")
     ax.grid(alpha=0.3, which="both")
     ax.set_xticks(x)
     ax.set_xticklabels([f"{int(b)}" for b in x])
     ax.legend(fontsize=9, loc="best")
 
     fig.suptitle(
-        f"Exp4b ({SIMULATOR}, $c={c_scale:g}$): plug-in vs oracle scaling",
+        f"Exp4b ({simulator}, $c={c_scale:g}$): plug-in vs oracle scaling",
         fontsize=13, y=1.02,
     )
     fig.tight_layout()
-    out_path = out_dir / "exp4b_qhat_ratio_vs_budget.png"
+    out_path = out_dir / f"exp4b_qhat_ratio_vs_budget_{simulator}.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    print(f"Saved: {out_path}")
+
+
+def _figure_h_ratio_grid(out_dir: Path, paired: pd.DataFrame, c_scale: float,
+                          sims: list, finite_sample_factor: float = 0.87):
+    """2x2 grid: h_plug/h_oracle vs B, one panel per DGP. Population limits
+    differ across DGPs (1 for Gaussian, kappa_nu for Student-t_nu); a dashed
+    finite-r_0 prediction multiplies the population limit by ~0.87 at r_0=10.
+    """
+    from scipy.stats import t as _t
+
+    fig, axes = plt.subplots(2, 2, figsize=(11, 8), sharex=True)
+    for ax, sim in zip(axes.ravel(), sims):
+        df_sim = paired[paired["simulator"] == sim].copy()
+        if df_sim.empty:
+            ax.set_visible(False)
+            continue
+        rows = []
+        for B, df in df_sim.groupby("budget", sort=True):
+            hr = df["h_ratio_plugin_over_oracle"].to_numpy()
+            hr = hr[~np.isnan(hr)]
+            rows.append({
+                "budget": int(B),
+                "med":  float(np.median(hr)) if hr.size else np.nan,
+                "q1":   float(np.quantile(hr, 0.25)) if hr.size else np.nan,
+                "q3":   float(np.quantile(hr, 0.75)) if hr.size else np.nan,
+            })
+        agg = pd.DataFrame(rows)
+        x = agg["budget"].to_numpy(dtype=float)
+
+        if sim == "nongauss_A1L":
+            nu = 3.0
+            pop_limit = float((_t.ppf(0.75, df=nu) - _t.ppf(0.25, df=nu)) / 1.349)
+            pop_label = rf"pop. limit $\kappa_3\approx{pop_limit:.3f}$"
+        else:
+            pop_limit = 1.0
+            pop_label = "pop. limit $= 1$ (Gauss)"
+
+        ax.fill_between(x, agg["q1"], agg["q3"], alpha=0.25, color="tab:green",
+                        label="25-75%")
+        ax.plot(x, agg["med"], "o-", color="tab:green", lw=2, ms=6, label="median")
+        ax.axhline(pop_limit, ls="--", color="tab:orange", label=pop_label)
+        ax.axhline(pop_limit * finite_sample_factor, ls=":", color="tab:red",
+                   label=rf"finite-$r_0$ pred. $\approx {pop_limit * finite_sample_factor:.2f}$")
+        ax.set_xscale("log")
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{int(b)}" for b in x])
+        ax.set_xlabel(r"Stage 1 budget $B = n_0 \cdot r_0$")
+        ax.set_ylabel(r"$\bar h_{\mathrm{plug}}/\bar h_{\mathrm{oracle}}$")
+        ax.set_title(sim)
+        ax.grid(alpha=0.3, which="both")
+        ax.legend(fontsize=8, loc="best")
+
+    fig.suptitle(
+        rf"Exp4b: bandwidth ratio across DGPs ($c={c_scale:g}$, $r_0=10$)",
+        fontsize=13, y=1.00,
+    )
+    fig.tight_layout()
+    out_path = out_dir / "exp4b_h_ratio_grid_4dgp.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    print(f"Saved: {out_path}")
+
+
+def _figure_cov_grid(out_dir: Path, paired: pd.DataFrame, n_bins: int, alpha: float,
+                      sims: list):
+    """2x2 grid: bin-wise coverage curves at the largest budget per DGP."""
+    target = 1.0 - alpha
+    fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+    for ax, sim in zip(axes.ravel(), sims):
+        df_sim = paired[paired["simulator"] == sim]
+        if df_sim.empty:
+            ax.set_visible(False)
+            continue
+        B_max = int(sorted(df_sim["budget"].unique())[-1])
+        cfg = get_experiment_config(sim)
+        x_lo = float(cfg["bounds"][0][0])
+        x_hi = float(cfg["bounds"][1][0])
+        bin_edges = np.linspace(x_lo, x_hi, n_bins + 1)
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+        for arm in ARMS:
+            loaded = _load_arm_curves(out_dir, sim, B_max, arm, bin_edges)
+            if loaded is None:
+                continue
+            cov_per, marg = loaded
+            med = np.nanmedian(cov_per, axis=0)
+            marg_med = float(np.median(marg))
+            ax.plot(
+                bin_centers, med,
+                color=ARM_COLOR[arm], ls=ARM_LS[arm], lw=1.7, marker="o", ms=3,
+                label=f"{ARM_LABEL[arm]} (m={marg_med:.3f})",
+            )
+        ax.axhline(target, ls=":", color="black", alpha=0.6,
+                   label=rf"target $1-\alpha={target:.2f}$")
+        ax.set_xlim(x_lo, x_hi)
+        ax.set_ylim(0.0, 1.05)
+        ax.set_xlabel("x")
+        ax.set_ylabel("conditional coverage")
+        ax.set_title(f"{sim} ($B={B_max}$)")
+        ax.grid(alpha=0.3)
+        ax.legend(loc="lower right", fontsize=7)
+
+    fig.suptitle(
+        "Exp4b: conditional coverage across DGPs (median over macroreps)",
+        fontsize=13, y=1.00,
+    )
+    fig.tight_layout()
+    out_path = out_dir / "exp4b_coverage_curves_grid_4dgp.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     print(f"Saved: {out_path}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot Exp4b: nongauss_A1L plug-in vs oracle")
+    parser = argparse.ArgumentParser(description="Plot Exp4b: plug-in vs oracle, per simulator")
     parser.add_argument("--output_dir", type=str, default="exp_adaptive_h/output_exp4")
+    parser.add_argument("--simulator",  type=str, default="nongauss_A1L",
+                        help="DGP name (one of exp1, gibbs_s1, wsc_gauss, nongauss_A1L) "
+                             "or 'all' to loop over all four.")
     parser.add_argument("--n_bins",     type=int,   default=20)
     parser.add_argument("--alpha",      type=float, default=0.1)
     parser.add_argument("--c_scale",    type=float, default=1.0,
@@ -220,8 +339,16 @@ def main():
         sys.exit(1)
     paired = pd.read_csv(paired_path)
 
-    _figure1_coverage(out_dir, paired, n_bins=args.n_bins, alpha=args.alpha)
-    _figure2_qhat_ratio(out_dir, paired, c_scale=args.c_scale)
+    if args.simulator == "all":
+        sims = ["exp1", "gibbs_s1", "wsc_gauss", "nongauss_A1L"]
+    else:
+        sims = [args.simulator]
+    for sim in sims:
+        _figure1_coverage(out_dir, sim, paired, n_bins=args.n_bins, alpha=args.alpha)
+        _figure2_qhat_ratio(out_dir, sim, paired, c_scale=args.c_scale)
+    if args.simulator == "all":
+        _figure_h_ratio_grid(out_dir, paired, c_scale=args.c_scale, sims=sims)
+        _figure_cov_grid(out_dir, paired, n_bins=args.n_bins, alpha=args.alpha, sims=sims)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
-# exp_wsc — WSC 2026 Paper Experiments (Tables 2–3)
+# exp_wsc_2026 — Archived WSC 2026 Paper Experiments (Tables 2–3)
+
+This is a historical reproduction runner. It is kept for reference only; the
+current active paper workflow is the target-aware, scale-adaptive CKME-DCP line
+under `exp_adaptive_h/`.
 
 This folder reproduces **Tables 2 and 3** from:
 
@@ -44,10 +48,11 @@ If R is not available, CKME results are still saved; benchmark columns will be `
 ### Step 1 — Pre-tune hyperparameters (run once)
 
 Runs k-fold CV on a pilot dataset to find the best `(ell_x, lam, h)` for each DGP.
-Results are saved to `exp_wsc/pretrained_params.json` and loaded automatically in Step 2.
+Results are saved to `_archive/exp_wsc_2026/pretrained_params.json` and loaded
+automatically in Step 2.
 
 ```bash
-python exp_wsc/pretrain_params.py
+python _archive/exp_wsc_2026/pretrain_params.py
 ```
 
 Optional arguments:
@@ -64,20 +69,20 @@ Optional arguments:
 
 Sequential (single core, ~8–12 h for 50 macroreps):
 ```bash
-python exp_wsc/run_wsc_compare.py --n_macro 50
+python _archive/exp_wsc_2026/run_wsc_compare.py --n_macro 50
 ```
 
 Parallel (recommended on a multi-core machine):
 ```bash
-python exp_wsc/run_wsc_compare.py --n_macro 50 --n_workers 8
+python _archive/exp_wsc_2026/run_wsc_compare.py --n_macro 50 --n_workers 8
 ```
 
 Quick smoke test (1 macrorep, ~5 min):
 ```bash
-python exp_wsc/run_wsc_compare.py --n_macro 1
+python _archive/exp_wsc_2026/run_wsc_compare.py --n_macro 1
 ```
 
-Output is written to `exp_wsc/output/`:
+Output is written to `_archive/exp_wsc_2026/output/`:
 ```
 output/
   wsc_per_macrorep.csv   — one row per (macrorep × DGP × budget × method)
@@ -90,7 +95,7 @@ output/
 ### Step 3 — Generate Tables 2–3
 
 ```bash
-python exp_wsc/make_tables.py
+python _archive/exp_wsc_2026/make_tables.py
 ```
 
 Prints Tables 2 and 3 to stdout in a readable text format.  Each cell shows

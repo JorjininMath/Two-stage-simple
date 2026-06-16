@@ -5,10 +5,14 @@ JOURNAL_PLAN.md
 EXPERIMENTS.md
 MEMORY.md
 subagent.md
+Journal_Ideas_*.md
+*.bak
 
 # Personal research notes and dissertation materials (local only)
 notes/
 dissertation_use/
+exp_stock/
+experiment_logs/
 
 # Claude Code local config
 .claude/
@@ -18,6 +22,7 @@ dissertation_use/
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
@@ -27,13 +32,23 @@ __pycache__/
 **/output/
 **/output_*/
 **/slurm_logs/
+output_run.log
+**/output_run.log
 temp_exp_code/
 
-# Deprecated/archived code (superseded by CKME/ and Two_stage/)
-_archive/
+# Deprecated/archived code (superseded by CKME/ and Two_stage/).
+# Keep only explicitly promoted public archive entries tracked.
+_archive/*
+!_archive/README.md
+!_archive/exp_wsc_2026/
+!_archive/exp_wsc_2026/*.md
+!_archive/exp_wsc_2026/*.txt
+!_archive/exp_wsc_2026/*.py
+!_archive/exp_wsc_2026/*.json
 
-# Images generated from experiments
+# Generated experiment/report artifacts
 *.png
+*.html
 
 # Editor
 .vscode/
@@ -48,3 +63,4 @@ _archive/
 *.toc
 *.synctex.gz
 *.pdf
+!paper/*.pdf

@@ -16,10 +16,14 @@ Usage:
     h_query = c_scale * est.predict(X_query)
 
 Notes:
+  - Per-site scale uses IQR / 1.349 (Silverman 1986, Hampel 1974) instead of
+    sample SD, for robustness to heavy-tailed noise. 1.349 = Phi^{-1}(0.75) -
+    Phi^{-1}(0.25), so under Gaussian: IQR/1.349 -> sigma.
   - For Gaussian DGPs, sigma_hat(x) -> sigma(Y|x) as n_0 r_0 -> infinity.
-  - For Student-t_3 (nongauss_A1L), sigma_hat(x) -> sigma(Y|x) = s(x) * sqrt(3),
-    NOT the oracle scale s(x). The Exp4b hypothesis is that conformal calibration
-    absorbs this constant sqrt(3) factor.
+  - For Student-t_nu, sigma_hat(x) -> kappa_nu * s(x) where
+    kappa_nu = (q_{0.75}(t_nu) - q_{0.25}(t_nu)) / 1.349 is a finite constant
+    (kappa_3 ~ 1.134). Variance of the IQR estimator is finite for any nu > 0,
+    unlike sample SD which has infinite variance for nu <= 4.
 """
 from __future__ import annotations
 
@@ -29,6 +33,7 @@ from typing import Optional
 import numpy as np
 
 _SIGMA_FLOOR = 1e-3  # mirror adaptive_h_utils._H_FLOOR
+_IQR_TO_SIGMA = 1.349  # Phi^{-1}(0.75) - Phi^{-1}(0.25); Gaussian-consistent scale
 
 
 def _silverman_bw(x_1d: np.ndarray) -> float:
@@ -89,7 +94,12 @@ class PluginSigma:
         d = X_all.shape[1]
         X_sites = X_all.reshape(n_0, r_0, d)[:, 0, :]  # one row per site
         Y_by_site = Y_all.reshape(n_0, r_0)
-        sigma_sites = Y_by_site.std(axis=1, ddof=1)
+        # Robust scale: IQR / 1.349 (Silverman 1986; Hampel 1974). Consistent
+        # for sigma under Gaussian; finite-variance for any Student-t_nu (unlike
+        # sample SD, which has infinite variance for nu <= 4).
+        q75 = np.percentile(Y_by_site, 75, axis=1)
+        q25 = np.percentile(Y_by_site, 25, axis=1)
+        sigma_sites = (q75 - q25) / _IQR_TO_SIGMA
 
         if bw is None:
             bw = np.array([_silverman_bw(X_sites[:, j]) for j in range(d)])

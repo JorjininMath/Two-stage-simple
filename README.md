@@ -36,7 +36,7 @@ Benchmarks: **DCP-DR** (distributional CP with quantile regression) and **hetGP*
 git clone https://github.com/JorjininMath/Two-stage-simple.git
 cd Two-stage-simple
 
-# Option A: conda (recommended, includes R dependencies)
+# Option A: conda (recommended for Python dependencies)
 conda env create -f environment.yml
 conda activate ckme_env
 
@@ -55,6 +55,8 @@ install.packages(c("quantreg", "hetGP", "mvtnorm", "MASS"))
 
 ```python
 from Two_stage import run_stage1_train, run_stage2
+from Two_stage.design import generate_space_filling_design
+from Two_stage.sim_functions import get_experiment_config
 from CKME.parameters import ParamGrid
 
 # Stage 1: train CKME with cross-validated hyperparameters
@@ -71,11 +73,21 @@ result = run_stage1_train(
     random_state=42,
 )
 
+# Candidate pool for Stage 2 site selection
+cfg = get_experiment_config("exp2")
+X_cand = generate_space_filling_design(
+    n=1000,
+    d=cfg["d"],
+    bounds=cfg["bounds"],
+    random_state=43,
+)
+
 # Stage 2: adaptive allocation + conformal calibration
 stage2 = run_stage2(
     stage1_result=result,
+    X_cand=X_cand,
     n_1=200, r_1=10,
-    method="lhs",   # "lhs" | "sampling" | "mixed"
+    method="sampling",   # "lhs" | "sampling" | "mixed"
     alpha=0.1,      # 90% prediction intervals
 )
 
@@ -83,6 +95,38 @@ stage2 = run_stage2(
 cp = stage2.cp
 print(f"Calibrated quantile: {cp.q_hat:.4f}")
 ```
+
+---
+
+## Current Paper Workflow
+
+The current active paper line is the target-aware, scale-adaptive CKME-DCP
+workflow in [`exp_adaptive_h/`](exp_adaptive_h/). It keeps adaptive `h(x)` at
+the experiment/evaluation layer while leaving the core CKME/CP API stable.
+
+```bash
+# Tune fixed CKME hyperparameters used by the adaptive-h experiments
+python exp_adaptive_h/pretrain_params.py
+
+# Main plug-in vs oracle vs fixed adaptive-h experiment
+python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
+python exp_adaptive_h/summarize_exp4.py
+
+# Figures for the journal-scale adaptive-h story
+python exp_adaptive_h/plot_exp4a.py
+python exp_adaptive_h/plot_exp4b.py --simulator all
+```
+
+The journal draft lives in
+[`manuscript/journal_scale_adaptive/`](manuscript/journal_scale_adaptive/):
+
+```bash
+cd manuscript/journal_scale_adaptive
+pdflatex target_aware_scale_adaptive_ckme_cp.tex
+```
+
+For the current active/supporting/archive experiment boundary, see
+[`EXPERIMENT_INDEX.md`](EXPERIMENT_INDEX.md).
 
 ---
 
@@ -113,38 +157,19 @@ python exp_gibbs_compare/plot_gibbs_compare.py \
     --output_dir exp_gibbs_compare/output_adaptive_c2.0
 ```
 
-### Experiment 1b — WSC 2026 Paper (`exp_wsc/`)
+### Archived WSC 2026 Reproduction
 
-Reproduces **Tables 2–3** of the WSC 2026 paper. Two 1D DGPs (Gaussian and Student-t ν=3, same heteroscedastic σ(x)); Stage 2 budget sweep over (n₁,r₁) ∈ {(100,50),(200,25),(500,10)}; three site-selection methods; 50 macroreps.
-
-```bash
-# Pretune hyperparameters (run once)
-python exp_wsc/pretrain_params.py
-
-# Full run (50 macroreps, parallel)
-python exp_wsc/run_wsc_compare.py --n_macro 50 --n_workers 8
-
-# Print Tables 2-3
-python exp_wsc/make_tables.py
-```
-
-See [`exp_wsc/README.md`](exp_wsc/README.md) for full details.
+The old WSC 2026 table-reproduction runner has been archived out of the active
+workflow. The `wsc_gauss` DGP remains registered in `Two_stage/sim_functions/`
+and is still used by `exp_adaptive_h/`, but current paper evidence should come
+from the adaptive-h workflow above rather than partial WSC runner outputs.
 
 ### Experiment 2 — Non-Gaussian Noise (`exp_nongauss/`)
 
-Six simulators (Student-t / Gamma / Gaussian-mixture, small/large non-Gaussianity). Compares CKME-CP against DCP-DR and hetGP.
-
-```bash
-# Pretune hyperparameters (run once)
-python exp_nongauss/pretrain_params.py
-
-# Run comparison
-python exp_nongauss/run_nongauss_compare.py --n_macro 50 --method lhs
-
-# Plot
-python exp_nongauss/plot_nongauss.py
-python exp_nongauss/plot_nongauss_noise.py --mode hist
-```
+Supporting non-Gaussian benchmark evidence against DCP-DR and hetGP. This
+folder still reflects the historical six-DGP plan, while the current simulator
+registry keeps the active Student-t A1 variants. Refresh this folder before
+treating it as a fully reproducible public workflow.
 
 ### Experiment 3 — Conditional Coverage Consistency (`exp_conditional_coverage/`)
 
@@ -189,7 +214,7 @@ python exp_adaptive_h/pretrain_params.py
 python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
 python exp_adaptive_h/summarize_exp4.py
 python exp_adaptive_h/plot_exp4a.py    # Gap Theorem decay (Gaussian DGPs)
-python exp_adaptive_h/plot_exp4b.py    # Coverage equivalence + h-ratio diagnostic (Student-t)
+python exp_adaptive_h/plot_exp4b.py --simulator all
 ```
 
 See [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md) for the full plan.
@@ -198,10 +223,15 @@ See [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md) for the full plan
 
 ## Manuscript
 
-Paper-level writeup assets (per-experiment `.tex` reports, shared header, sections) live in [`manuscript/`](manuscript/). Auto-generated tables (e.g. `exp_adaptive_h/output_exp4/exp4_table.tex`) stay in their experiment output directories and are referenced via `\input{...}`; figures are pulled via `\graphicspath{{../../exp_*/output/}}`.
+Paper-level writeup assets live in [`manuscript/`](manuscript/). The active
+journal draft is under
+[`manuscript/journal_scale_adaptive/`](manuscript/journal_scale_adaptive/).
+Auto-generated tables and figures stay in experiment output directories and are
+referenced from the manuscript.
 
 ```bash
-cd manuscript/reports && pdflatex nongauss_report.tex
+cd manuscript/journal_scale_adaptive
+pdflatex target_aware_scale_adaptive_ckme_cp.tex
 ```
 
 ---
@@ -238,25 +268,28 @@ Two-stage-simple/
 │   ├── io.py                    # Save/load stage results
 │   ├── config_utils.py          # config.txt loader
 │   └── sim_functions/           # Simulator implementations
-│       ├── simulator.py         # Registry
-│       ├── sim_exp1.py          # MG1 queue (1D, Gaussian)
-│       ├── sim_exp2.py          # sin+x (1D, Gaussian)
+│       ├── __init__.py          # Registry
+│       ├── exp1.py              # MG1 queue (1D, Gaussian)
+│       ├── exp2.py              # sin+x (1D, Gaussian)
+│       ├── sim_exp2_gauss.py    # WSC-style Gaussian DGP variants
 │       ├── sim_nongauss_A1.py   # Student-t noise (A1S / A1L)
-│       ├── sim_nongauss_B2.py   # Gamma noise (B2S / B2L)
-│       ├── sim_nongauss_C1.py   # Gaussian mixture (C1S / C1L)
 │       ├── sim_gibbs_s1.py      # Gibbs Setting 1: σ(x) = |sin(x)|
 │       └── sim_gibbs_s2.py      # Gibbs Setting 2: σ(x) = 2φ(x/1.5)
 │
 ├── exp_gibbs_compare/           # Exp 1: CKME-CP vs RLCP
-├── exp_wsc/                     # Exp 1b: WSC 2026 paper reproduction
 ├── exp_nongauss/                # Exp 2: Non-Gaussian noise
 ├── exp_conditional_coverage/    # Exp 3: Coverage consistency
 ├── exp_design/                  # Exp 4: Design comparison
 ├── exp_onesided/                # Exp 5: One-sided quantile
 ├── exp_adaptive_h/              # Exp 6: Adaptive bandwidth h(x)
+├── ckme_dcp_mm1/                # Feasibility-only KME/CKME M/M/1 input-uncertainty module
 │
+├── EXPERIMENT_INDEX.md          # Active/supporting/archive experiment boundary
+├── paper/                       # Dated shareable PDF snapshots
 ├── manuscript/                  # Paper-level tex writeup
+│   ├── journal_scale_adaptive/  # Current journal draft source
 │   └── reports/                 # Per-experiment .tex reports
+├── _archive/                    # Tracked public archive entries plus ignored local history
 │
 ├── dcp_r.R                      # R: DCP-DR + hetGP benchmarks
 ├── run_benchmarks_one_case.R    # R: single-case benchmark runner
@@ -273,13 +306,13 @@ Two-stage-simple/
 |------|-------------|-----|------------|
 | `exp1` | MG1 queue: $\zeta(x)=1.5x^2/(1-x)$ | 1D $[0.1, 0.9]$ | Heteroscedastic Gaussian |
 | `exp2` | $f(x)=x+\sin(\pi x)$ | 1D $[0, 2\pi]$ | Heteroscedastic Gaussian |
-| `nongauss_A1S/L` | $f(x)=e^{x/10}\sin x$, Student-t ($\nu=10/3$) | 1D $[0,2\pi]$ | Student-t |
-| `nongauss_B2S/L` | Same mean, Gamma ($k=9/2$) | 1D $[0,2\pi]$ | Centered Gamma |
-| `nongauss_C1S/L` | Same mean, Gaussian mixture ($\pi=0.02/0.10$) | 1D $[0,2\pi]$ | Gaussian mixture |
+| `wsc_gauss` | $f(x)=e^{x/10}\sin x$, $\sigma(x)=0.01+0.2(x-\pi)^2$ | 1D $[0,2\pi]$ | Heteroscedastic Gaussian |
+| `nongauss_A1S/L` | Same mean/scale as `wsc_gauss`, Student-t ($\nu=10$ or $3$) | 1D $[0,2\pi]$ | Student-t |
 | `gibbs_s1` | $Y=0.5x+\sigma(x)\varepsilon$, $\sigma(x)=\lvert\sin x\rvert$ | 1D | Heteroscedastic Gaussian |
 | `gibbs_s2` | Same form, $\sigma(x)=2\varphi(x/1.5)$ | 1D | Heteroscedastic Gaussian |
 
-All noise variances are normalized to $\sigma_\text{tar}(x) = 0.01 + 0.2(x-\pi)^2$ for the nongauss family, so that S (small) and L (large) differ only in distributional shape.
+The archived non-Gaussian Gamma and mixture variants are not part of the current
+active simulator registry.
 
 ---
 
