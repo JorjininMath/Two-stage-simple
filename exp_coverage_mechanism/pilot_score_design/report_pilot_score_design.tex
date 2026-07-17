@@ -1,0 +1,416 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+\captionsetup{font=small,labelfont=bf}
+
+\title{Equal-Tailed versus Width-Optimized Conformal Scores\\
+under CDF Estimation Error: A Pilot Study}
+\author{CKME--CP project --- pilot for the score-choice ablation (E4)}
+\date{July 16, 2026 (v3: adds the PCP sub-study; 50 macroreplications throughout)}
+
+\newcommand{\Fhat}{\widehat{F}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Split conformal prediction guarantees coverage for \emph{any} nonconformity
+score; scores differ only in interval width. For skewed output distributions,
+a width-optimized score promises intervals up to $12$--$28\%$ narrower than
+the equal-tailed default used in our paper. This pilot tests whether that
+promise survives when the conditional CDF must be estimated from a realistic
+simulation budget. It does not. Across $50$ macroreplications per budget, the
+optimizer's \emph{typical} run is only mildly narrower than the equal-tailed
+baseline (median $\approx -3\%$, far from the oracle $-12.3\%$), while a
+minority of runs fail catastrophically (up to $+224\%$ wider) because the
+optimized cut points chase poorly estimated tails. The failures dominate the
+mean at both budgets ($+14.0\%$ at $600$ runs, $+7.6\%$ at $2{,}000$ runs);
+raising the budget halves the failure rate ($20\% \to 10\%$) but does not
+eliminate it. A fixed protective constraint reduces the damage without ever
+beating the baseline. A companion sub-study ports the paper's
+scale-normalization principle to the sample-based PCP score (Wang et al.,
+2023): under heteroscedastic noise, raw PCP tilts conditional coverage
+strongly with the noise scale (bin coverage $0.73$--$1.00$, exactly as our
+score-homogeneity analysis predicts), and normalizing its score by the
+replication-based scale estimate compresses the tilt $4.4$-fold. Both
+studies support the paper's central thesis: efficiency and conditional
+behavior are governed at the estimation layer, and principles derived there
+transfer across score families.
+\end{abstract}
+
+\section{Purpose and connection to the paper}
+
+Our paper constructs prediction intervals for stochastic simulation outputs.
+A kernel-based estimator (CKME) learns the conditional distribution function
+$F(t \mid x)$ of the output $Y$ at input $x$ from a designed set of
+simulation runs, and split conformal prediction (CP) calibrates the intervals
+on held-out runs so that $90\%$ coverage is guaranteed regardless of how well
+$F$ was estimated. The paper's central thesis is a division of labor: the
+\emph{calibration layer} guarantees coverage, while interval
+\emph{efficiency} (width) is governed by the \emph{estimation layer}.
+
+Within this pipeline, a \emph{conformal score} determines the shape of the
+interval. The paper uses the score $\lvert \Fhat(y\mid x) - \tfrac12 \rvert$,
+which yields equal-tailed intervals. A natural question, raised by the
+advisor, is whether this score is the best choice: for skewed output
+distributions, a width-optimized score promises intervals that are
+$12$--$28\%$ narrower in theory. This pilot answers two questions
+empirically:
+\begin{itemize}
+  \item[\textbf{Q1}] Do width-optimized score variants realize their
+  theoretical gains when $F$ must be estimated from a realistic simulation
+  budget?
+  \item[\textbf{Q2}] Can a constraint derived from our tail-error analysis
+  protect those gains?
+\end{itemize}
+The results inform the score-choice ablation planned for the paper and
+provide a direct test of the layer-separation thesis: promises made at the
+score layer can only be cashed at the estimation layer.
+
+\section{Background}
+
+Write $u = \Fhat(y \mid x) \in [0,1]$ for the estimated probability position
+of an output value $y$ (the probability integral transform, PIT). If $\Fhat$
+were exact, $u$ would be uniformly distributed. A $90\%$ prediction interval
+can be built by keeping all $y$ whose PIT falls in a band
+$[\theta,\, \theta + 0.9]$, and CP widens or narrows this band by a
+calibrated margin $\hat q$ so that $90\%$ coverage holds exactly. Every
+choice of the cut point $\theta \in [0, 0.1]$ gives a valid method; the
+choices differ only in width:
+\begin{itemize}
+  \item \textbf{Equal-tailed (ET).} $\theta = 0.05$, cutting $5\%$ from each
+  tail; this is the paper's default score
+  $\lvert \Fhat(y \mid x) - \tfrac12 \rvert$ in disguise.
+  \item \textbf{Width-optimized (opt).} For each $x$, pick $\theta^{*}(x)$
+  minimizing the estimated band width
+  $\Fhat^{-1}(\theta + 0.9 \mid x) - \Fhat^{-1}(\theta \mid x)$. For the
+  skewed test distribution below, the \emph{oracle} version of this rule
+  gives intervals $12.3\%$ narrower than ET, by cutting almost everything
+  from the long right tail (oracle cut $\theta^{*} \approx 0.003$; see the
+  oracle reference widths in Section~3).
+  \item \textbf{Bias-constrained opt (b-opt, our proposal).} The same width
+  minimization, but interval endpoints may not sit where the estimated
+  density is below $15\%$ of its local peak. This is an implementable proxy
+  for our theoretical tail-error formula, which shows that quantile
+  estimation error is amplified by $1/f$ --- precisely in the deep tails the
+  width optimizer likes to chase.
+\end{itemize}
+
+The hazard being tested: moving $\theta$ toward $0$ places an endpoint at an
+extreme quantile, where the estimated CDF is flattest and least reliable. If
+the tail estimate is poor, the calibration layer must widen \emph{all}
+intervals to repair coverage, so the optimized score can end up wider than
+the simple one.
+
+\section{Experimental design}
+
+\paragraph{Data-generating process.}
+$Y = m(x) + 0.3\,\varepsilon$ with $m(x) = e^{x/10}\sin x$ on
+$x \in [0, 2\pi]$, and $\varepsilon$ a standardized Gamma$(2)$ variable
+(mean $0$, variance $1$, skewness $1.41$). The noise is skewed so that width
+optimization has a real prize (oracle: $-12.3\%$ width), and homoscedastic so
+that the score comparison is not confounded with the paper's separate
+bandwidth-adaptation question.
+
+\paragraph{Oracle reference widths.}
+Because the noise is homoscedastic, both oracle widths are constant in $x$
+and can be computed exactly from the noise quantile function. Let
+$q_{\varepsilon}(p) = \bigl(F^{-1}_{\Gamma(2)}(p) - 2\bigr)/\sqrt{2}$ denote
+the quantile function of the standardized Gamma$(2)$ noise. The oracle
+\emph{equal-tailed} width at level $1-\alpha = 0.9$ is
+\begin{equation}
+w^{\mathrm{or}}_{\mathrm{ET}}
+  = s \,\bigl[\, q_{\varepsilon}(0.95) - q_{\varepsilon}(0.05) \,\bigr]
+  = 0.3 \times 3.103 = 0.931,
+\label{eq:oracle-et}
+\end{equation}
+and the oracle \emph{shortest} width is the best member of the PIT-band
+family,
+\begin{equation}
+w^{\mathrm{or}}_{\mathrm{short}}
+  = s \,\min_{\theta \in [0,\,\alpha]}
+    \bigl[\, q_{\varepsilon}(\theta + 1 - \alpha) - q_{\varepsilon}(\theta)
+    \,\bigr]
+  = 0.3 \times 2.721 = 0.816,
+\label{eq:oracle-short}
+\end{equation}
+attained at $\theta^{*} \approx 0.003$ (an interior optimum: the Gamma$(2)$
+density also vanishes at the left endpoint of its support, so cutting
+exactly $\theta = 0$ is not optimal). Equations~\eqref{eq:oracle-et} and
+\eqref{eq:oracle-short} are two views of one comparison:
+$w^{\mathrm{or}}_{\mathrm{ET}} / w^{\mathrm{or}}_{\mathrm{short}} - 1 =
++14.0\%$ (ET is $14\%$ wider than the shortest band), equivalently
+$1 - w^{\mathrm{or}}_{\mathrm{short}} / w^{\mathrm{or}}_{\mathrm{ET}} =
+-12.3\%$ (the shortest band is $12.3\%$ narrower than ET). Since the
+experiment reports paired differences \emph{relative to ET}, the relevant
+oracle target throughout is $-12.3\%$.
+
+\paragraph{Data sizes.}
+Training: $60$ space-filling design sites $\times\, 10$ replications $= 600$
+simulator runs (low budget), or $200 \times 10 = 2{,}000$ runs (high budget).
+Calibration: $300$ fresh input--output pairs drawn uniformly. Test: $1{,}000$
+fresh pairs. The CDF is evaluated on a $220$-point output grid; CKME
+hyperparameters are held fixed across arms (length scale $0.3$, ridge
+$10^{-3}$, output smoothing bandwidth $0.05$). Macroreplications: $50$ per
+budget, each regenerating all data from a fresh seed (seeds $20260716{+}k$
+and $20260800{+}k$, $k = 0,\dots,49$). Total compute $\approx 3$ minutes on a
+laptop-scale machine.
+
+\paragraph{Protocol.}
+Within each macroreplication, all three scores share the \emph{same} fitted
+CKME model and the \emph{same} calibration set, so differences between arms
+are attributable to the score alone (a paired design). The cut point
+$\theta^{*}(x)$ is searched over a $41$-point grid on $[10^{-4}, 0.1]$.
+Validity is measured as the coverage of the conformal set itself (the exact
+quantity the CP theorem guarantees); width is measured on the
+monotone-projected interval, the paper's reporting convention.
+
+\section{Results}
+
+Table~\ref{tab:summary} summarizes all runs; Figures~\ref{fig:validity} and
+\ref{fig:paired} show the same information graphically.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Summary over $50$ macroreplications per budget. ``Coverage'' is the
+marginal coverage of the conformal set at nominal level $0.90$. ``Width'' is
+the mean prediction-interval width in response units; the oracle equal-tailed
+width is $0.931$ and the oracle shortest width is $0.816$. ``Paired $\Delta$
+width vs.\ ET'' is the per-macroreplication percentage width difference
+against the ET arm. ``Fail.\ rate'' is the share of macroreplications more
+than $20\%$ wider than ET (catastrophic tail-chasing failures). ``Mean
+$\theta^{*}$'' is the average lower-tail cut point chosen by the score (ET
+fixes $0.050$; smaller values indicate deeper tail-chasing).}
+\label{tab:summary}
+\begin{tabular}{llcccccc}
+\toprule
+Budget & Score & Coverage & Width & Width &
+Paired $\Delta$ vs.\ ET & Fail. & Mean \\
+ & & & (mean) & (SD) & (mean / median) & rate & $\theta^{*}$ \\
+\midrule
+$B=600$  & ET    & 0.900 & 0.955 & 0.065 & ---                  & ---    & 0.050 \\
+         & opt   & 0.901 & 1.096 & 0.465 & $+14.0\%$ / $-3.0\%$ & $20\%$ & 0.016 \\
+         & b-opt & 0.900 & 0.998 & 0.274 & $+4.2\%$ / $-0.7\%$  & $8\%$  & 0.024 \\
+\midrule
+$B=2000$ & ET    & 0.902 & 0.904 & 0.041 & ---                  & ---    & 0.050 \\
+         & opt   & 0.904 & 0.979 & 0.444 & $+7.6\%$ / $-3.1\%$  & $10\%$ & 0.013 \\
+         & b-opt & 0.902 & 0.946 & 0.299 & $+4.3\%$ / $-1.4\%$  & $4\%$  & 0.019 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{pilot_fig1_validity_width.png}
+\caption{Validity and efficiency of the three conformal scores at two
+simulation budgets ($50$ macroreplications each). \textbf{(a)}~Marginal
+coverage of the conformal prediction set: each colored dot is one
+macroreplication, black bars show the mean $\pm$ one standard error, and the
+dashed gray line is the nominal level $0.90$. All six arm$\times$budget cells
+sit on the nominal line --- score choice never threatens validity.
+\textbf{(b)}~Mean interval width (response units): dotted horizontal lines
+mark the oracle equal-tailed width (blue, $0.931$) and the oracle shortest
+width (red, $0.816$). At both budgets the width-optimized arms show a
+compact bulk near the ET cloud plus a scatter of extreme outliers ---
+the signature of rare tail-chasing failures.}
+\label{fig:validity}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.72\textwidth]{pilot_fig2_paired_deltas.png}
+\caption{Paired width comparison against the equal-tailed baseline. Each dot
+is one macroreplication's percentage width difference
+$(\text{arm} - \text{ET})/\text{ET}$; negative values mean the arm is
+narrower than ET. Black diamonds: mean $\pm$ one standard error. The red
+dotted line ($-12.3\%$) is the oracle gain of the shortest band, i.e., the
+best achievable value. The distributions are heavy-tailed upward at
+\emph{both} budgets: medians are mildly negative ($-3.0\%$ and $-3.1\%$ for
+opt) but $20\%$ ($B=600$) and $10\%$ ($B=2000$) of macroreplications exceed
+$+20\%$, with extremes of $+172\%$ and $+224\%$, dragging the means to
+$+14.0\%$ and $+7.6\%$. The b-opt constraint reduces the failure rate
+($8\%$ and $4\%$) without ever beating ET on average.}
+\label{fig:paired}
+\end{figure}
+
+\paragraph{Findings.}
+\begin{itemize}
+  \item[\textbf{F1}] \textbf{(Validity.)} All three scores attain $0.90$
+  coverage at both budgets --- as theory predicts, score choice is purely an
+  efficiency question.
+  \item[\textbf{F2}] \textbf{(The theoretical gain does not survive
+  estimation.)} The width optimizer chases the poorly estimated deep tail
+  (mean $\theta^{*} = 0.016$ vs.\ $0.050$ for ET). Its risk profile is
+  heavy-tailed: the typical macroreplication is mildly narrower than ET
+  (median $-3.0\%$, a quarter of the oracle prize), but $20\%$ of
+  macroreplications at $B = 600$ come out more than $20\%$ wider (up to
+  $+172\%$), inverting the mean to $+14.0\%$ with a width SD seven times
+  that of ET.
+  \item[\textbf{F3}] \textbf{(More budget shrinks but does not remove the
+  failure mode.)} At $B = 2000$ the typical gain is stable (median
+  $-3.1\%$; the optimizer is narrower in $70\%$ of macroreplications,
+  signed-rank $p = 0.03$), and the failure rate halves ($20\% \to 10\%$) ---
+  yet the surviving failures are as extreme as ever (up to $+224\%$), so the
+  \emph{mean} remains inverted ($+7.6\%$). A caution on experiment sizing:
+  an earlier $8$-macroreplication version of this pilot happened to contain
+  no failure at $B = 2000$ and showed a mean gain of $-2.6\%$; with $50$
+  macroreplications that conclusion reverses. Rare-failure phenomena require
+  large macroreplication counts.
+  \item[\textbf{F4}] \textbf{(A fixed protective constraint is not enough.)}
+  The density-floor constraint (b-opt) cuts the failure rate at both budgets
+  ($20\% \to 8\%$ and $10\% \to 4\%$) and reduces the mean damage, but it
+  never beats ET on average ($+4.2\%$ and $+4.3\%$) and its typical gain is
+  smaller than the unconstrained optimizer's. A fixed threshold is either
+  too loose to prevent failures or too tight to keep the gains; the safe
+  tail-chasing depth depends on estimation quality, so the constraint must
+  be calibrated from the estimated tail error itself.
+\end{itemize}
+
+\section{Extension: a sample-based score (PCP) and scale normalization}
+
+\paragraph{Background and prediction.}
+Probabilistic Conformal Prediction (PCP; Wang et al., AISTATS 2023) replaces
+CDF evaluation by \emph{sampling}: draw $K$ conditional samples
+$\hat y_1,\dots,\hat y_K$ from the estimated conditional law, use the score
+$E = \min_k \lvert y - \hat y_k\rvert$, and report the union of $K$ intervals
+of calibrated radius. Because our projected CKME CDF can be sampled by
+inverse transform, PCP is directly implementable on top of our estimator.
+Our score-homogeneity analysis makes a sharp prediction: under the
+location-scale model, $E \mid X = x$ is distributed as
+$s(x)\cdot\min_k\lvert\varepsilon-\varepsilon_k'\rvert$ --- the score
+\emph{scales with the local noise level} --- so a single global threshold
+must over-cover where $s(x)$ is small and under-cover where $s(x)$ is large,
+the same pathology as fixed-bandwidth DCP. The predicted repair is the
+paper's own device: normalize the score by the replication-based scale
+estimate, $E/\hat s(x)$ (arm \texttt{pcp\_scaled}).
+
+\paragraph{Design.}
+Arms: \texttt{ET} (reference), \texttt{pcp} ($K = 40$ inverse-transform
+samples per point), \texttt{pcp\_scaled} ($E/\hat s_{\mathrm{NW}}(x)$, scale
+from training-site replications with Nadaraya--Watson smoothing). DGPs: the
+skewed Gamma DGP of Section~3 (homoscedastic control) and a heteroscedastic
+Gaussian DGP with the same mean function and
+$s(x) = 0.10 + 0.20(x-\pi)^2$ (scale ratio $\approx 20$ across the domain).
+Budget $B = 600$; calibration $300$; test $2{,}000$ points in $10$
+equal-width $x$-bins; $50$ macroreplications per DGP (seeds $20260900{+}k$,
+$20261000{+}k$). Set size is the Lebesgue measure of the union (PCP sets are
+generally disconnected; Table~\ref{tab:pcp} reports the mean component
+count).
+
+\begin{table}[H]
+\centering
+\small
+\caption{PCP sub-study over $50$ macroreplications per DGP. ``Size'' is the
+Lebesgue measure of the conformal set (for ET, the interval width).
+``\#Comp.''\ is the mean number of disconnected components. ``Bin-cov.\
+range'' is $\max - \min$ of the $10$-bin coverage profile and
+``$\rho(\mathrm{cov}, s)$'' its Spearman correlation with the noise scale
+(heteroscedastic DGP only; the homoscedastic DGP has constant $s$).}
+\label{tab:pcp}
+\begin{tabular}{llccccc}
+\toprule
+DGP & Score & Coverage & Size (SD) & \#Comp. & Bin-cov.\ range &
+$\rho(\mathrm{cov}, s)$ \\
+\midrule
+skewed Gamma  & ET          & 0.901 & 0.958 (0.060) & 1.00 & --- & --- \\
+(homosced.)   & pcp         & 0.900 & 1.113 (0.051) & 4.48 & --- & --- \\
+              & pcp\_scaled & 0.900 & 1.118 (0.052) & 4.32 & --- & --- \\
+\midrule
+heterosced.\  & ET          & 0.898 & 2.495 (0.143) & 1.00 & 0.109 & $-0.86$ \\
+Gaussian      & pcp         & 0.902 & 2.905 (0.163) & 3.13 & \textbf{0.274} & $-0.98$ \\
+              & pcp\_scaled & 0.897 & 3.004 (0.135) & 3.96 & \textbf{0.062} & $-0.81$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{pilot_pcp_fig.png}
+\caption{PCP sub-study. \textbf{(a)}~Bin coverage of the conformal set on
+the heteroscedastic Gaussian DGP: each colored line is one score (markers =
+bin means over $50$ macroreplications, error bars = one standard error), the
+dashed gray line is the nominal level $0.90$, and the dotted gray curve
+(right axis) is the noise scale $s(x)$. Raw PCP (red) mirrors $s(x)$:
+over-coverage up to $0.999$ where the noise is small, under-coverage down to
+$0.725$ where it is large. Scale normalization (green, $E/\hat s(x)$)
+flattens the profile ($4.4\times$ smaller range), flatter even than the
+fixed-bandwidth ET reference (blue). \textbf{(b)}~Mean set size
+(Lebesgue measure, mean $\pm$ one standard error) by score and DGP.}
+\label{fig:pcp}
+\end{figure}
+
+\paragraph{Findings.}
+\begin{itemize}
+  \item[\textbf{F5}] \textbf{(Validity.)} All arms attain marginal coverage
+  $0.90$ on both DGPs --- sample-based scores and normalization leave the
+  guarantee untouched.
+  \item[\textbf{F6}] \textbf{(The tilt prediction is confirmed, and our
+  normalization repairs it.)} Raw PCP's bin coverage tracks $-s(x)$ almost
+  perfectly (Spearman $-0.98$) with a $27$-percentage-point range;
+  $E/\hat s(x)$ compresses the range to $6$ points, flatter than the
+  fixed-bandwidth ET reference. This is direct evidence that the paper's
+  estimation-layer principle (align the score's implicit scale with the
+  local aleatoric scale) transfers to other score families.
+  \item[\textbf{F7}] \textbf{(PCP is a baseline, not a replacement.)} On
+  these unimodal DGPs PCP pays a $16$--$20\%$ measure premium over the ET
+  band and fragments into $3$--$4.5$ components on average; its structural
+  advantage (multimodal conditional laws) is absent here. Scale
+  normalization slightly increases average measure on the heteroscedastic
+  DGP ($3.00$ vs $2.91$) --- reallocating coverage from narrow over-covered
+  regions to wide under-covered ones raises total measure, the same
+  price/benefit structure as adaptive vs fixed bandwidth.
+\end{itemize}
+
+\section{Conclusion}
+
+Score choice never affects the coverage guarantee, but its efficiency
+promises are only as good as the estimated CDF behind them. Against an
+oracle prize of $-12.3\%$, the width-optimized score delivers a typical gain
+of only $\approx 3\%$ and a heavy tail of catastrophic failures (up to
+$+224\%$ wider) that inverts its mean performance at both budgets tested;
+more data thins the failures out but does not remove them. A fixed
+protective constraint reduces the damage without ever winning. The PCP
+sub-study shows the same thesis from the constructive side: a sample-based
+score inherits a scale-inhomogeneity exactly where our analysis predicts,
+and the paper's replication-based normalization repairs it while leaving the
+guarantee untouched. Practical default for the paper: keep the equal-tailed
+score; report the PCP arms as portability evidence.
+
+\section{Implications for the paper}
+
+\begin{itemize}
+  \item Keep the equal-tailed DCP score as the paper's main score; this
+  pilot justifies the choice quantitatively rather than by convention.
+  \item Report the heavy-tailed risk profile of width optimization
+  (Figure~\ref{fig:paired}) as part of the score-choice ablation: it is
+  direct evidence for the paper's thesis that score-layer efficiency
+  promises are bounded by estimation-layer quality --- the same argument
+  that motivates our scale-adaptive bandwidth.
+  \item An error-calibrated tail-depth rule (replacing the fixed density
+  floor by the paper's tail-error formula, including its variance part) is a
+  promising follow-up, but it is future work, not a claim of the current
+  paper.
+  \item Methodological note for all experiments: rare-failure effects are
+  invisible at small macroreplication counts (the $8$-rep version of this
+  pilot reached the opposite conclusion at $B=2000$); the paper's standard
+  of $\geq 50$ macroreplications is necessary, not cosmetic.
+\end{itemize}
+
+\vspace{1em}
+\noindent\small\textit{Reproducibility.}
+\texttt{exp\_coverage\_mechanism/pilot\_score\_design/} contains the runners
+(\texttt{pilot\_score\_design.py}, \texttt{pilot\_pcp.py}), raw
+per-macroreplication results (\texttt{pilot\_n50\_b600.csv},
+\texttt{pilot\_n50\_b2000.csv}, \texttt{pilot\_pcp\_n50.csv}), and the figure
+scripts (\texttt{plot\_pilot\_report\_figs.py}, \texttt{plot\_pcp\_fig.py}).
+Seeds and all settings are hard-coded in the runners; the full study reruns
+in about $4$ minutes.
+
+\end{document}
