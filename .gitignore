@@ -12,7 +12,10 @@ Journal_Ideas_*.md
 notes/
 dissertation_use/
 exp_stock/
-experiment_logs/
+experiment_logs/*
+!experiment_logs/README.md
+!experiment_logs/templates/
+!experiment_logs/templates/**
 
 # Claude Code local config
 .claude/
@@ -49,6 +52,8 @@ _archive/*
 # Generated experiment/report artifacts
 *.png
 *.html
+*.jpg
+*.tmp
 
 # Editor
 .vscode/
