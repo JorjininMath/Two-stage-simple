@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from sklearn.model_selection import KFold
+from sklearn.model_selection import GroupKFold, KFold
 
 try:
     from joblib import Parallel, delayed
@@ -150,6 +150,7 @@ def _evaluate_params_cv(
     cv_folds: int,
     random_state: Optional[int],
     n_jobs: int = 1,
+    groups: Optional[ArrayLike] = None,
 ) -> CVResult:
     """
     Evaluate a single parameter combination using k-fold CV.
@@ -181,6 +182,16 @@ def _evaluate_params_cv(
         Number of parallel jobs. If 1, runs sequentially.
         If > 1, uses joblib for parallelization.
 
+    groups : ndarray, shape (n,), optional
+        Site labels for replicated data (rows sharing a label are
+        replications at the same design site). When given, folds are
+        site-grouped (GroupKFold) so that all replications of a site land
+        in the SAME fold. Plain shuffled KFold on flattened replicated
+        rows puts replications of one site in both train and validation
+        folds; the validation fold then rewards interpolating the site's
+        own noise (replicate leakage), which biases CV toward
+        under-smoothing (too-small ell_x / lam / h).
+
     Returns
     -------
     cv_result : CVResult
@@ -190,12 +201,22 @@ def _evaluate_params_cv(
     Y_train = np.asarray(Y_train, dtype=float).ravel()
     n = X_train.shape[0]
 
-    # Create KFold splitter
-    kf = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+    # Create fold splitter: site-grouped when groups are given.
+    if groups is not None:
+        groups = np.asarray(groups).ravel()
+        if groups.shape[0] != n:
+            raise ValueError(
+                f"groups must have length {n}, got {groups.shape[0]}"
+            )
+        kf = GroupKFold(n_splits=cv_folds)
+        split_iter = kf.split(X_train, Y_train, groups)
+    else:
+        kf = KFold(n_splits=cv_folds, shuffle=True, random_state=random_state)
+        split_iter = kf.split(X_train)
 
     # Prepare fold evaluations
     fold_tasks = []
-    for train_idx, val_idx in kf.split(X_train):
+    for train_idx, val_idx in split_iter:
         X_train_fold = X_train[train_idx]
         Y_train_fold = Y_train[train_idx]
         X_val_fold = X_train[val_idx]
@@ -252,6 +273,7 @@ def cross_validate_ckme(
     random_state: Optional[int] = None,
     n_jobs: int = 1,
     verbose: bool = False,
+    groups: Optional[ArrayLike] = None,
 ) -> TuningResults:
     """
     Perform k-fold cross-validation for CKME parameter tuning.
@@ -296,6 +318,13 @@ def cross_validate_ckme(
 
     verbose : bool, default=False
         If True, print progress information.
+
+    groups : ndarray, shape (n,), optional
+        Site labels for replicated training data. When given, CV folds are
+        site-grouped (GroupKFold) to prevent replicate leakage; see
+        _evaluate_params_cv. For data laid out as n_sites consecutive
+        blocks of r replications, pass
+        np.repeat(np.arange(n_sites), r).
 
     Returns
     -------
@@ -368,7 +397,8 @@ def cross_validate_ckme(
         cv_results = Parallel(n_jobs=n_jobs)(
             delayed(_evaluate_params_cv)(
                 X_train, Y_train, params, t_grid, loss_fn,
-                cv_folds, random_state, n_jobs=1  # n_jobs=1 for inner folds
+                cv_folds, random_state, n_jobs=1,  # n_jobs=1 for inner folds
+                groups=groups,
             )
             for params in param_list
         )
@@ -380,7 +410,8 @@ def cross_validate_ckme(
                 print(f"  Evaluating parameter combination {i+1}/{n_params}...")
             result = _evaluate_params_cv(
                 X_train, Y_train, params, t_grid, loss_fn,
-                cv_folds, random_state, n_jobs=1
+                cv_folds, random_state, n_jobs=1,
+                groups=groups,
             )
             cv_results.append(result)
 
@@ -419,6 +450,7 @@ def tune_ckme_params(
     random_state: Optional[int] = None,
     n_jobs: int = 1,
     verbose: bool = False,
+    groups: Optional[ArrayLike] = None,
 ) -> Tuple[Params, TuningResults]:
     """
     Convenience wrapper for parameter tuning.
@@ -455,6 +487,10 @@ def tune_ckme_params(
     verbose : bool, default=False
         If True, print progress information.
 
+    groups : ndarray, shape (n,), optional
+        Site labels for replicated data; enables site-grouped CV folds
+        (see cross_validate_ckme).
+
     Returns
     -------
     best_params : Params
@@ -478,6 +514,7 @@ def tune_ckme_params(
         random_state=random_state,
         n_jobs=n_jobs,
         verbose=verbose,
+        groups=groups,
     )
     return results.best_params, results
 

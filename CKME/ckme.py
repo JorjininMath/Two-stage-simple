@@ -170,6 +170,18 @@ class CKMEModel:
             t_grid = np.asarray(t_grid, dtype=float).ravel()
             if verbose:
                 print("Starting parameter tuning with k-fold cross-validation...")
+            # Replicated data (r > 1): site-grouped CV folds so replications
+            # of one site never straddle train/validation (replicate leakage
+            # biases CV toward under-smoothing). Rows are laid out as
+            # n_sites consecutive blocks of r replications.
+            if self.r > 1:
+                if X.shape[0] % self.r != 0:
+                    raise ValueError(
+                        f"n rows ({X.shape[0]}) not divisible by r={self.r}"
+                    )
+                cv_groups = np.repeat(np.arange(X.shape[0] // self.r), self.r)
+            else:
+                cv_groups = None
             best_params, tuning_results = tune_ckme_params(
                 X_train=X,
                 Y_train=Y,
@@ -180,6 +192,7 @@ class CKMEModel:
                 random_state=random_state,
                 n_jobs=n_jobs,
                 verbose=verbose,
+                groups=cv_groups,
             )
             self.tuning_results = tuning_results
             params = best_params
