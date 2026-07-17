@@ -11,6 +11,10 @@ Primary workflow for the current target-aware, scale-adaptive CKME-DCP paper.
 It uses the existing scalar-h core pipeline and evaluates adaptive `h(x)` at the
 experiment layer.
 
+The final adaptive-bandwidth benchmark specification is
+[`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md). The older
+`exp_adaptive_h/Exp_plan.md` is a working plan retained for history.
+
 Key commands:
 
 ```bash

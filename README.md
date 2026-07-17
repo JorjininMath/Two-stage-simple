@@ -103,6 +103,8 @@ print(f"Calibrated quantile: {cp.q_hat:.4f}")
 The current active paper line is the target-aware, scale-adaptive CKME-DCP
 workflow in [`exp_adaptive_h/`](exp_adaptive_h/). It keeps adaptive `h(x)` at
 the experiment/evaluation layer while leaving the core CKME/CP API stable.
+The final adaptive-bandwidth benchmark specification is
+[`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md).
 
 ```bash
 # Tune fixed CKME hyperparameters used by the adaptive-h experiments
@@ -217,7 +219,9 @@ python exp_adaptive_h/plot_exp4a.py    # Gap Theorem decay (Gaussian DGPs)
 python exp_adaptive_h/plot_exp4b.py --simulator all
 ```
 
-See [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md) for the full plan.
+See [`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md) for the final benchmark
+specification. The older [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md)
+is retained as a historical working plan.
 
 ---
 
