@@ -26,7 +26,7 @@ if str(_root) not in sys.path:
 from CKME.parameters import ParamGrid
 from Two_stage import run_stage1_train
 
-SIMULATORS = [
+DEFAULT_SIMULATORS = [
     "wsc_gauss",      # Gaussian, smooth U
     "gibbs_s1",       # Gaussian, interior zero (|sin(x)|, x in [-3, 3])
     "exp1",           # Gaussian, boundary explosion (MG1, x in [0.1, 0.9])
@@ -41,6 +41,20 @@ PARAM_GRID = ParamGrid(
 )
 
 
+def _parse_simulators(value: str) -> list[str]:
+    sims = [s.strip() for s in value.split(",") if s.strip()]
+    if not sims:
+        raise ValueError("At least one simulator must be provided")
+    return sims
+
+
+def _parse_float_list(value: str) -> list[float]:
+    vals = [float(v.strip()) for v in value.split(",") if v.strip()]
+    if not vals:
+        raise ValueError("At least one value must be provided")
+    return vals
+
+
 def pretrain_one(
     simulator_func: str,
     n_pilot: int,
@@ -48,13 +62,16 @@ def pretrain_one(
     cv_folds: int,
     t_grid_size: int,
     random_state: int,
+    param_grid: ParamGrid = PARAM_GRID,
+    n_jobs: int = 1,
 ) -> dict:
     result = run_stage1_train(
         n_0=n_pilot,
         r_0=r_pilot,
         simulator_func=simulator_func,
-        param_grid=PARAM_GRID,
+        param_grid=param_grid,
         cv_folds=cv_folds,
+        n_jobs=n_jobs,
         t_grid_size=t_grid_size,
         random_state=random_state,
     )
@@ -67,14 +84,45 @@ def main():
     ap.add_argument("--n_pilot", type=int, default=200)
     ap.add_argument("--r_pilot", type=int, default=10)
     ap.add_argument("--cv_folds", type=int, default=5)
+    ap.add_argument("--n_jobs", type=int, default=1)
     ap.add_argument("--t_grid_size", type=int, default=500)
     ap.add_argument("--seed", type=int, default=20260501)
+    ap.add_argument(
+        "--simulators",
+        type=str,
+        default=",".join(DEFAULT_SIMULATORS),
+        help="Comma-separated simulator names. Example: exp2_gauss_low",
+    )
     ap.add_argument(
         "--out",
         type=str,
         default=str(Path(__file__).parent / "pretrained_params.json"),
     )
+    ap.add_argument(
+        "--ell_x_grid",
+        type=str,
+        default=",".join(str(v) for v in PARAM_GRID.ell_x_list),
+        help="Comma-separated ell_x candidates.",
+    )
+    ap.add_argument(
+        "--lam_grid",
+        type=str,
+        default=",".join(str(v) for v in PARAM_GRID.lam_list),
+        help="Comma-separated lambda candidates.",
+    )
+    ap.add_argument(
+        "--h_grid",
+        type=str,
+        default=",".join(str(v) for v in PARAM_GRID.h_list),
+        help="Comma-separated fixed-h candidates.",
+    )
     args = ap.parse_args()
+    simulators = _parse_simulators(args.simulators)
+    param_grid = ParamGrid(
+        ell_x_list=_parse_float_list(args.ell_x_grid),
+        lam_list=_parse_float_list(args.lam_grid),
+        h_list=_parse_float_list(args.h_grid),
+    )
 
     out_path = Path(args.out)
     out: dict[str, dict] = {}
@@ -84,7 +132,7 @@ def main():
         except Exception:
             out = {}
 
-    for sim in SIMULATORS:
+    for sim in simulators:
         print(f"\n=== CV pretraining: {sim} ===")
         best = pretrain_one(
             simulator_func=sim,
@@ -93,6 +141,8 @@ def main():
             cv_folds=args.cv_folds,
             t_grid_size=args.t_grid_size,
             random_state=args.seed,
+            param_grid=param_grid,
+            n_jobs=args.n_jobs,
         )
         print(f"  best: ell_x={best['ell_x']}, lam={best['lam']}, h={best['h']}")
         out[sim] = best

@@ -5,7 +5,8 @@ For each (macrorep, simulator, Stage1 budget B): train Stage 1 once, run Stage 2
 once, then evaluate THREE arms on the same X_test / Y_test:
   - "fixed"   : standard CP pipeline with scalar h from pretrained CV.
   - "plugin"  : adaptive h(x) = c * sigma_hat(x) where sigma_hat(x) is built
-                from Stage 1 raw data via per-site std + Nadaraya-Watson smoothing.
+                from Stage 1 raw data via per-site sample std +
+                Nadaraya-Watson smoothing.
   - "oracle"  : adaptive h(x) = c * s(x) where s(x) is the per-DGP oracle scale.
 
 We sweep n_0 * r_0 in {50, 100, 250, 500} with r_0 fixed at 10 (so
@@ -51,7 +52,7 @@ from Two_stage import run_stage1_train, run_stage2
 from Two_stage.evaluation import evaluate_per_point
 from Two_stage.test_data import generate_test_data
 
-SIMULATORS = [
+DEFAULT_SIMULATORS = [
     "wsc_gauss",
     "gibbs_s1",
     "exp1",
@@ -63,9 +64,14 @@ STAGE2_METHOD = "lhs"
 
 T_GRID_MARGIN = {
     "wsc_gauss":    0.30,
+    "exp2_gauss_low": 0.30,
+    "exp2_gauss_high": 0.50,
     "gibbs_s1":     0.30,
     "exp1":         0.50,
     "nongauss_A1L": 2.00,
+    "hd_locscale_d2": 2.00,
+    "hd_locscale_d5": 2.00,
+    "hd_locscale_d20": 2.00,
 }
 
 DEFAULT_BUDGETS = [50, 100, 250, 500]
@@ -97,6 +103,8 @@ def _evaluate_adaptive_arm(
     model  = stage2.model
     t_grid = stage2.t_grid
 
+    # Raw point-evaluated scores (guarantee-bearing, grid-free); intervals
+    # below are the monotone-projected representation for reporting.
     q_hat = adaptive_recalibrate_q(model, stage2.X_stage2, stage2.Y_stage2, h_cal, alpha)
 
     L, U = adaptive_predict_interval(model, X_test, h_test, t_grid, q_hat)
@@ -137,6 +145,10 @@ def run_one_macrorep(
     n_grid: int,
     params: Params,
     c_scale: float,
+    plugin_bw_factor: float,
+    stage1_design: str,
+    sim_seed_offset: int,
+    budget_seed_offset: int,
 ) -> list[dict]:
     """Train one (macrorep, simulator, budget) combo and evaluate 3 arms."""
     if budget % r0_fixed != 0:
@@ -148,12 +160,11 @@ def run_one_macrorep(
     r_1   = config["r_1"]
     alpha = config["alpha"]
 
-    sim_idx = SIMULATORS.index(simulator_func)
     seed = (
         base_seed
         + macrorep_id * 100000
-        + sim_idx * 10000
-        + DEFAULT_BUDGETS.index(budget) * 1000
+        + sim_seed_offset * 10000
+        + budget_seed_offset * 1000
     )
 
     X_cand = get_x_cand(simulator_func, config["n_cand"], random_state=seed + 1)
@@ -162,7 +173,7 @@ def run_one_macrorep(
         n_0=n_0, r_0=r_0,
         simulator_func=simulator_func,
         params=params,
-        design_method=STAGE1_DESIGN,
+        design_method=stage1_design,
         t_grid_size=n_grid,
         t_grid_margin=T_GRID_MARGIN.get(simulator_func),
         random_state=seed + 2,
@@ -216,7 +227,13 @@ def run_one_macrorep(
     })
 
     # --- Arm 2: plug-in adaptive h(x) = c * sigma_hat(x) ---
-    plugin = PluginSigma.fit(stage1.X_all, stage1.Y_all, n_0, r_0)
+    plugin = PluginSigma.fit(
+        stage1.X_all,
+        stage1.Y_all,
+        n_0,
+        r_0,
+        bw_factor=plugin_bw_factor,
+    )
     h_cal_pl  = plugin.get_h(stage2.X_stage2, c_scale)
     h_test_pl = plugin.get_h(X_test, c_scale)
     df_plugin = _evaluate_adaptive_arm(
@@ -239,6 +256,7 @@ def run_one_macrorep(
         "interval_score": float(df_plugin["interval_score"].mean()),
         "q_hat":          float(df_plugin.attrs["q_hat"]),
         "mean_h_query":   float(np.mean(h_test_pl)),
+        "plugin_bw_factor": float(plugin_bw_factor),
     })
 
     # --- Arm 3: oracle adaptive h(x) = c * s(x) ---
@@ -277,6 +295,13 @@ def _parse_int_list(s: str) -> list[int]:
     return [int(x) for x in s.split(",") if x.strip()]
 
 
+def _parse_str_list(s: str) -> list[str]:
+    vals = [x.strip() for x in s.split(",") if x.strip()]
+    if not vals:
+        raise ValueError("At least one value is required")
+    return vals
+
+
 def main():
     parser = argparse.ArgumentParser(description="Exp4: plug-in vs fixed vs oracle adaptive h")
     parser.add_argument("--config",     type=str, default="exp_adaptive_h/config.txt")
@@ -285,6 +310,21 @@ def main():
     parser.add_argument("--base_seed",  type=int, default=20260501)
     parser.add_argument("--c_scale",    type=float, default=1.0,
                         help="Multiplier in adaptive h(x) = c * scale. Default 1.0.")
+    parser.add_argument("--plugin_bw_factor", type=float, default=1.0,
+                        help="Multiplier on PluginSigma's Silverman kernel bandwidth. Default 1.0.")
+    parser.add_argument("--stage1_design", type=str, default=STAGE1_DESIGN,
+                        choices=["grid", "lhs"],
+                        help="Stage 1 design. Use lhs for d > 1 pilot runs.")
+    parser.add_argument("--simulators", type=str,
+                        default=",".join(DEFAULT_SIMULATORS),
+                        help="Comma-separated simulator names. Example: exp2_gauss_low")
+    parser.add_argument("--pretrained_path", type=str, default=None,
+                        help="Path to pretrained params JSON. Defaults to exp_adaptive_h/pretrained_params.json.")
+    parser.add_argument("--allow_default_params", action="store_true",
+                        help="Use default Params for simulators missing from pretrained params.")
+    parser.add_argument("--default_ell_x", type=float, default=1.0)
+    parser.add_argument("--default_lam", type=float, default=1e-2)
+    parser.add_argument("--default_h", type=float, default=0.3)
     parser.add_argument("--budgets",    type=str,
                         default=",".join(str(b) for b in DEFAULT_BUDGETS),
                         help=f"Comma-separated Stage 1 budgets n_0*r_0. "
@@ -295,6 +335,7 @@ def main():
     args = parser.parse_args()
 
     budgets = _parse_int_list(args.budgets)
+    simulators = _parse_str_list(args.simulators)
     for b in budgets:
         if b % args.r0_fixed != 0:
             print(f"ERROR: budget {b} not divisible by r0_fixed={args.r0_fixed}",
@@ -307,18 +348,33 @@ def main():
     out_dir = Path(args.output_dir) if args.output_dir else _root / "exp_adaptive_h" / "output_exp4"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    pretrained_path = _root / "exp_adaptive_h" / "pretrained_params.json"
-    if not pretrained_path.exists():
+    pretrained_path = (
+        Path(args.pretrained_path)
+        if args.pretrained_path
+        else _root / "exp_adaptive_h" / "pretrained_params.json"
+    )
+    raw = {}
+    if not pretrained_path.exists() and not args.allow_default_params:
         print(
             f"ERROR: {pretrained_path} not found.\n"
             "Run 'python exp_adaptive_h/pretrain_params.py' first.",
             file=sys.stderr,
         )
         sys.exit(1)
-    raw = json.loads(pretrained_path.read_text())
-    pretrained = {sim: Params(**raw[sim]) for sim in SIMULATORS if sim in raw}
-    missing = [s for s in SIMULATORS if s not in pretrained]
-    if missing:
+    if pretrained_path.exists():
+        raw = json.loads(pretrained_path.read_text())
+    pretrained = {sim: Params(**raw[sim]) for sim in simulators if sim in raw}
+    missing = [s for s in simulators if s not in pretrained]
+    if missing and args.allow_default_params:
+        fallback = Params(
+            ell_x=args.default_ell_x,
+            lam=args.default_lam,
+            h=args.default_h,
+        )
+        for sim in missing:
+            pretrained[sim] = fallback
+        print(f"WARNING: using default params for missing simulators: {missing}")
+    elif missing:
         print(f"ERROR: pretrained params missing for: {missing}", file=sys.stderr)
         sys.exit(1)
     print(f"Loaded pretrained params: {pretrained_path}")
@@ -327,18 +383,20 @@ def main():
 
     print(
         f"\nn_macro={args.n_macro}, n_workers={args.n_workers}, c_scale={args.c_scale}, "
-        f"budgets={budgets}, r0_fixed={args.r0_fixed}\n"
+        f"plugin_bw_factor={args.plugin_bw_factor}, simulators={simulators}, "
+        f"budgets={budgets}, r0_fixed={args.r0_fixed}, stage1_design={args.stage1_design}\n"
         f"output_dir={out_dir}"
     )
 
     rep_rows: list[dict] = []
-    for sim in SIMULATORS:
+    for sim_idx, sim in enumerate(simulators):
         params = pretrained[sim]
-        for B in budgets:
+        for budget_idx, B in enumerate(budgets):
             print(f"\n--- {sim}  budget={B} (n_0={B // args.r0_fixed}, r_0={args.r0_fixed}) ---")
             jobs = [
                 (k, args.base_seed, config, sim, B, args.r0_fixed,
-                 out_dir, n_grid, params, args.c_scale)
+                 out_dir, n_grid, params, args.c_scale,
+                 args.plugin_bw_factor, args.stage1_design, sim_idx, budget_idx)
                 for k in range(args.n_macro)
             ]
             if args.n_workers > 1:

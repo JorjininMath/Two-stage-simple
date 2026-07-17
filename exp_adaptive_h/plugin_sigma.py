@@ -3,11 +3,12 @@ plugin_sigma.py
 
 Plug-in noise std estimator sigma_hat(x) for adaptive bandwidth h(x) = c * sigma_hat(x).
 
-Design (Option A from the Exp4 plan):
+Design:
   1. From Stage 1 data D_0 = (X_all, Y_all) with n_0 sites x r_0 replicates,
      compute per-site sample std: sigma_site[i] = std(Y at site i, ddof=1).
   2. Smooth (X_0, sigma_site) with Nadaraya-Watson regression using a Gaussian
-     kernel and Silverman's rule of thumb for the bandwidth.
+     kernel and Silverman's rule of thumb for the bandwidth. The bandwidth can
+     be multiplied by bw_factor for diagnostic tuning.
   3. Return a callable that maps any X_query -> sigma_hat(X_query), floored at
      a small constant to avoid h(x) = 0 in low-noise regions (e.g., gibbs_s1).
 
@@ -16,14 +17,9 @@ Usage:
     h_query = c_scale * est.predict(X_query)
 
 Notes:
-  - Per-site scale uses IQR / 1.349 (Silverman 1986, Hampel 1974) instead of
-    sample SD, for robustness to heavy-tailed noise. 1.349 = Phi^{-1}(0.75) -
-    Phi^{-1}(0.25), so under Gaussian: IQR/1.349 -> sigma.
-  - For Gaussian DGPs, sigma_hat(x) -> sigma(Y|x) as n_0 r_0 -> infinity.
-  - For Student-t_nu, sigma_hat(x) -> kappa_nu * s(x) where
-    kappa_nu = (q_{0.75}(t_nu) - q_{0.25}(t_nu)) / 1.349 is a finite constant
-    (kappa_3 ~ 1.134). Variance of the IQR estimator is finite for any nu > 0,
-    unlike sample SD which has infinite variance for nu <= 4.
+  - This estimator uses replications at the same x. Without replications, use
+    residual-based local scale estimation instead.
+  - For Gaussian DGPs, sigma_hat(x) -> sigma(Y|x) as n_0 and r_0 grow.
 """
 from __future__ import annotations
 
@@ -33,7 +29,6 @@ from typing import Optional
 import numpy as np
 
 _SIGMA_FLOOR = 1e-3  # mirror adaptive_h_utils._H_FLOOR
-_IQR_TO_SIGMA = 1.349  # Phi^{-1}(0.75) - Phi^{-1}(0.25); Gaussian-consistent scale
 
 
 def _silverman_bw(x_1d: np.ndarray) -> float:
@@ -55,7 +50,7 @@ class PluginSigma:
 
     Stored fields:
       X_sites : (n_0, d) site coordinates from Stage 1
-      sigma_sites : (n_0,) per-site sample std (ddof=1)
+      sigma_sites : (n_0,) per-site sample std estimate
       bw : (d,) NW bandwidth per dimension (Silverman's rule on X_sites)
     """
     X_sites: np.ndarray
@@ -70,12 +65,15 @@ class PluginSigma:
         n_0: int,
         r_0: int,
         bw: Optional[np.ndarray] = None,
+        bw_factor: float = 1.0,
     ) -> "PluginSigma":
         """Build the estimator from Stage 1 raw data.
 
         X_all is (n_0 * r_0, d), with site i occupying rows [i*r_0, (i+1)*r_0).
         Y_all is (n_0 * r_0,).
         """
+        if bw_factor <= 0:
+            raise ValueError(f"bw_factor must be positive; got {bw_factor}")
         X_all = np.atleast_2d(X_all)
         Y_all = np.asarray(Y_all).ravel()
         if X_all.shape[0] != n_0 * r_0:
@@ -94,15 +92,10 @@ class PluginSigma:
         d = X_all.shape[1]
         X_sites = X_all.reshape(n_0, r_0, d)[:, 0, :]  # one row per site
         Y_by_site = Y_all.reshape(n_0, r_0)
-        # Robust scale: IQR / 1.349 (Silverman 1986; Hampel 1974). Consistent
-        # for sigma under Gaussian; finite-variance for any Student-t_nu (unlike
-        # sample SD, which has infinite variance for nu <= 4).
-        q75 = np.percentile(Y_by_site, 75, axis=1)
-        q25 = np.percentile(Y_by_site, 25, axis=1)
-        sigma_sites = (q75 - q25) / _IQR_TO_SIGMA
+        sigma_sites = np.std(Y_by_site, axis=1, ddof=1)
 
         if bw is None:
-            bw = np.array([_silverman_bw(X_sites[:, j]) for j in range(d)])
+            bw = bw_factor * np.array([_silverman_bw(X_sites[:, j]) for j in range(d)])
         else:
             bw = np.asarray(bw).ravel()
             if bw.shape[0] != d:
