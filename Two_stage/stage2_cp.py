@@ -25,6 +25,7 @@ def stage2_cp_calibrate(
     Y_stage2: ArrayLike,
     alpha: float = 0.1,
     verbose: bool = False,
+    t_grid: ArrayLike | None = None,
 ) -> CP:
     """
     Calibrate CP using Stage 2 data D_1 only.
@@ -57,7 +58,8 @@ def stage2_cp_calibrate(
             f"Got {X_stage2.shape[0]} vs {Y_stage2.shape[0]}"
         )
     cp = CP(model=model, alpha=alpha, score_type="abs_median")
-    cp.calibrate(X_stage2, Y_stage2, verbose=verbose)
+    # Pass t_grid to score through the monotone-projected CDF (Policy B).
+    cp.calibrate(X_stage2, Y_stage2, verbose=verbose, t_grid=t_grid)
     if verbose:
         print(f"Stage 2 CP calibrated: q̂ = {cp.q_hat:.6f}")
     return cp

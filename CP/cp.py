@@ -119,6 +119,7 @@ class CP:
         X_cal: ArrayLike,
         Y_cal: ArrayLike,
         verbose: bool = False,
+        t_grid: ArrayLike | None = None,
     ) -> None:
         """
         Calibrate the CP model using a calibration set.
@@ -153,6 +154,7 @@ class CP:
             self.alpha,
             score_type=self.score_type,
             verbose=verbose,
+            t_grid=t_grid,
         )
 
     # ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ def calibrate(
     alpha: float,
     score_type: str = "abs_median",
     verbose: bool = False,
+    t_grid: ArrayLike | None = None,
 ) -> tuple[float, ArrayLike]:
     """
     Calibrate the CP model using a calibration set.
@@ -99,6 +100,28 @@ def calibrate(
     else:
         G_cal = model.indicator.g_matrix(model.Y, Y_cal)          # (n, n_cal)
     F_cal = np.sum(C_cal * G_cal, axis=0)  # shape (n_cal,)
+
+    if t_grid is not None:
+        # Policy B (notes/planning/cdf_legality_policy.md): score through the
+        # monotone-projected CDF, Ftilde(y) = max(raw F at y, running max of
+        # raw F over grid points t <= y), so calibration scores use the same
+        # object as interval extraction in CP/interval.py.
+        t_arr = np.asarray(t_grid, dtype=float).ravel()
+        if getattr(model, 'r', 1) > 1:
+            G_grid = model.indicator.g_matrix(Y_flat, t_arr)
+            G_grid = G_grid.reshape(model.n, model.r, -1).mean(axis=1)
+        else:
+            G_grid = model.indicator.g_matrix(model.Y, t_arr)
+        F_grid = C_cal.T @ G_grid                      # (n_cal, T) raw rows
+        R_grid = np.maximum.accumulate(F_grid, axis=1)  # running max in t
+        pos = np.searchsorted(t_arr, Y_cal, side="right") - 1  # last t_k <= y_j
+        grid_part = np.where(
+            pos >= 0,
+            R_grid[np.arange(n_cal), np.clip(pos, 0, None)],
+            -np.inf,
+        )
+        F_cal = np.maximum(F_cal, grid_part)
+
     np.clip(F_cal, 0.0, 1.0, out=F_cal)
 
     # Compute nonconformity scores from CDF values
@@ -106,9 +129,14 @@ def calibrate(
 
     # Compute conformal quantile: k = ceil((1-alpha)*(1+n)), q̂ = sort(scores)[k-1]
     k = int(np.ceil((1 - alpha) * (1 + n_cal)))
-    k = min(k, n_cal)
-    sorted_scores = np.sort(calibration_scores)
-    q_hat = float(sorted_scores[k - 1])
+    if k > n_cal:
+        # Edge case (n_cal too small for level alpha): the split-CP proof
+        # requires q_hat = +inf here (predict the whole space); silently
+        # truncating to the max score would break the coverage guarantee.
+        q_hat = float("inf")
+    else:
+        sorted_scores = np.sort(calibration_scores)
+        q_hat = float(sorted_scores[k - 1])
 
     if verbose:
         print(f"Calibration completed:")
