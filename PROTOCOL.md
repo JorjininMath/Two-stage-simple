@@ -19,7 +19,7 @@ bandwidth `h(x) = c * s_hat(x)` applied to ALL training responses at
 evaluation time (NOT training-site-specific h_i — that is a different
 estimator). `s_hat(x)` is the plug-in scale: per-site sample SD smoothed by
 Nadaraya-Watson regression. `h(x)` is floored (see
-`exp_adaptive_h/adaptive_h_utils.py`) to avoid degenerate indicators.
+`experiments/adaptive_h/adaptive_bandwidth.py`) to avoid degenerate indicators.
 
 ## 2. Hyperparameter tuning
 
@@ -66,13 +66,15 @@ break the guarantee.
   score membership `score(y) <= q_hat`.
 - **Reporting layer (width / interval score):** the monotone-projected
   interval — running max over the t-grid, clip to [0,1], generalized inverse
-  (`CP/interval.py::projected_quantile_interval`, the single shared
+  (`src/CP/interval.py::projected_quantile_interval`, the single shared
   implementation). Width and Winkler interval score are ONLY defined on this
   interval. The raw score set's Lebesgue measure coincides with the interval
   width iff the set is connected; discrepancies are reported, not hidden.
 
 Rationale and edge cases (saturation, non-monotone raw CDFs, searchsorted on
-non-monotone arrays): `notes/planning/cdf_legality_policy.md` (local),
+non-monotone arrays):
+`notes/decisions/2026-07-15-cdf-legality-and-interval-reporting-policy.md`
+(local),
 summarized in the relevant experiment specs.
 
 ## 5. Experiment conventions

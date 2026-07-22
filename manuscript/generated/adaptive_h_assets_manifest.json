@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-22T18:57:53.182687+00:00",
+  "generator": "tools/export_manuscript_assets.py",
+  "evidence_scope": "Non-IQR Exp1-Exp3 manuscript snapshot assets",
+  "final_protocol_evidence": false,
+  "explicit_exclusions": [
+    "All Exp4 artifacts until the locked-protocol sample-SD/NW run exists",
+    "All retired IQR response-scale plug-in artifacts"
+  ],
+  "assets": [
+    {
+      "evidence_id": "adaptive_h_exp1_fixed_reference",
+      "role": "Fixed-bandwidth mechanism reference table",
+      "source": "experiments/adaptive_h/output_exp1/exp1_table.tex",
+      "destination": "manuscript/generated/tables/adaptive_h/exp1_fixed_reference_table.tex",
+      "source_modified_at": "2026-05-01T07:27:41.607127+00:00",
+      "size_bytes": 807,
+      "sha256": "b1eca2d1e49b4f926d4ac440a44ebf05f836563a48f6a8b9b6c1ebfe7bffefda",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_exp1_fixed_reference",
+      "role": "Fixed-bandwidth binwise coverage reference",
+      "source": "experiments/adaptive_h/output_exp1/exp1_coverage_curves.png",
+      "destination": "manuscript/generated/figures/adaptive_h/exp1_fixed_reference_coverage.png",
+      "source_modified_at": "2026-05-01T07:27:52.255312+00:00",
+      "size_bytes": 218566,
+      "sha256": "cb2ddc2e1d8235e38dc7cf6877a30107f80b320b57e66fc892ddda89e67dfc9b",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_exp2_oracle_vs_fixed",
+      "role": "Oracle versus fixed paired comparison table",
+      "source": "experiments/adaptive_h/output_exp2/exp2_table.tex",
+      "destination": "manuscript/generated/tables/adaptive_h/exp2_oracle_vs_fixed_table.tex",
+      "source_modified_at": "2026-05-01T13:33:00.874953+00:00",
+      "size_bytes": 824,
+      "sha256": "18556d751b3fb897388c9cf586d145ed53e3cfd5fa52cf28825288d629d46d03",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_exp2_oracle_vs_fixed",
+      "role": "Oracle versus fixed binwise coverage curves",
+      "source": "experiments/adaptive_h/output_exp2/exp2_coverage_curves.png",
+      "destination": "manuscript/generated/figures/adaptive_h/exp2_oracle_vs_fixed_coverage.png",
+      "source_modified_at": "2026-05-01T07:49:26.392840+00:00",
+      "size_bytes": 276794,
+      "sha256": "265477435a2fd1d6535e171d36e1531a3a6f1881e846534171c8d203e1603591",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_exp3_multiplier_sweep",
+      "role": "Oracle bandwidth-multiplier sensitivity table",
+      "source": "experiments/adaptive_h/output_exp3/exp3_table.tex",
+      "destination": "manuscript/generated/tables/adaptive_h/exp3_oracle_c_sweep_table.tex",
+      "source_modified_at": "2026-05-01T13:56:52.369770+00:00",
+      "size_bytes": 779,
+      "sha256": "dcbe9931c9099ca3b9a37bc70372b0434be06058ead4c4137bdf9dd6e3e000cb",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_exp3_multiplier_sweep",
+      "role": "Oracle bandwidth-multiplier sensitivity figure",
+      "source": "experiments/adaptive_h/output_exp3/exp3_metric_vs_c.png",
+      "destination": "manuscript/generated/figures/adaptive_h/exp3_oracle_c_sweep_metrics.png",
+      "source_modified_at": "2026-05-01T13:57:01.298974+00:00",
+      "size_bytes": 207271,
+      "sha256": "c74f78042d575d116aefe4aa0b63e4cea52bcb22ad86f3b5df8188ca56fc7b78",
+      "destination_exists": true
+    }
+  ]
+}

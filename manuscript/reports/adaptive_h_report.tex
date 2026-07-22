@@ -2,347 +2,134 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{booktabs}
 \usepackage{amsmath,amssymb}
-\usepackage{array}
-\usepackage{xcolor}
-\usepackage{hyperref}
-\usepackage{caption}
-\usepackage{subcaption}
 \usepackage{graphicx}
-\usepackage{multirow}
+\usepackage{hyperref}
 
-% Figures live in exp_adaptive_h/output_*. Compile from manuscript/reports/.
+% Paper-facing assets are copied through tools/export_manuscript_assets.py,
+% which records their source paths and hashes.
 \graphicspath{
-  {../../exp_adaptive_h/output_exp1/}
-  {../../exp_adaptive_h/output_exp2/}
-  {../../exp_adaptive_h/output_exp3/}
-  {../../exp_adaptive_h/output_exp4_iqr/}
-  {../../exp_adaptive_h/output_exp4/}
+  {../generated/figures/adaptive_h/}
 }
 
-\title{Adaptive Bandwidth $h(x)$ for CKME-Based Conformal Prediction \\[0.5em]
-  \large Oracle and Plug-in Estimators}
+\title{Oracle Adaptive Bandwidth Diagnostics for CKME-Based Conformal Prediction}
 \author{}
 \date{\today}
 
 \begin{document}
 \maketitle
 
-% ===========================================================================
-\section{Introduction}
-% ===========================================================================
+\paragraph{Status.}
+This report records the fixed-versus-oracle adaptive-bandwidth diagnostics.
+The numerical results predate the locked estimator and calibration protocol in
+\texttt{PROTOCOL.md}; they are retained as mechanism evidence rather than as
+final manuscript results. The implementable plug-in method is defined separately
+in \texttt{experiments/adaptive\_h/planned\_final\_benchmark\_spec.md} as
+per-site sample standard deviation followed
+by Nadaraya--Watson smoothing. Its final results should be reported only after a
+protocol-aligned run.
 
-We study adaptive bandwidth selection $h(x)$ for the smooth indicator inside
-the CKME conditional CDF estimator, when used as the score function in split
-conformal prediction. The standard practice fixes $h$ at a single CV-tuned
-scalar; we ask whether locally-adaptive $h(x)$ improves \emph{conditional}
-performance (interval score, group-conditional coverage) without breaking
-marginal validity.
+\section{Question}
 
-The report has two parts:
-\begin{description}
-  \item[Oracle ($\S$\ref{sec:oracle}).] When the per-$x$ noise scale $s(x)$
-  is known, set $h(x) = c \cdot s(x)$. We establish marginal validity, paired
-  improvement in interval score, and the role of $c$ in the
-  fairness--width trade-off.
-  \item[Plug-in ($\S$\ref{sec:plugin}).] When $s(x)$ is unknown, estimate it
-  from Stage~1 raw data. We use a robust scale (IQR$/1.349$) smoothed by
-  Nadaraya--Watson regression. We quantify the gap to the oracle and verify
-  the estimator's behavior under heavy-tailed (Student-$t_3$) noise.
-\end{description}
-
-% ===========================================================================
-\section{Setup}\label{sec:setup}
-% ===========================================================================
-
-\subsection{Pipeline}
-
-Across both parts we use a fixed two-stage pipeline:
-\begin{enumerate}
-  \item Train CKME on $D_0 = \{(x_i, y_{ij})\}$ with $n_0$ sites and $r_0$
-  replicates per site (Stage~1).
-  \item Calibrate split conformal on $D_1$ collected at $n_1$ Stage-2 sites
-  with $r_1$ replicates each.
-  \item Evaluate on $n_{\mathrm{test}}$ test points.
-\end{enumerate}
-Hyperparameters $(\ell_x, \lambda, h)$ are CV-tuned per DGP on a pilot dataset
-(\texttt{exp\_adaptive\_h/pretrain\_params.py}). Pre-experiment sensitivity
-analysis confirmed $h$-insensitivity on a finer grid; the reported values
-hit the lower edge of the CV grid but the experiments were verified
-insensitive to further reduction.
-
-\subsection{Adaptive bandwidth evaluation}
-
-The CKME coefficients $C(x) = (K_X + \lambda I)^{-1} k_x$ depend only on the
-$x$-kernel; the bandwidth $h$ enters only through the smooth indicator
-$g_{t,h}$. We can therefore swap a per-query bandwidth $h(x_*)$ at evaluation
-time without retraining: the conditional CDF estimate becomes
+The standard CKME conditional CDF estimator uses a single CV-tuned smooth-indicator
+bandwidth. Under heterogeneous conditional response scales, the effective
+bandwidth is \(h/s(x)\), so a fixed \(h\) can oversmooth low-scale regions and
+undersmooth high-scale regions. The oracle diagnostic asks whether replacing the
+scalar bandwidth with
 \[
-  \widehat{F}_h(t \mid x_*) = \langle C(x_*),\ g_{t,h(x_*)}(Y) \rangle.
+  h(x)=c\,s(x)
 \]
-Calibration recomputes $\hat{q}$ using $h(x_i)$ at each calibration point;
-prediction inverts the level set on a $t$-grid using $h(x_*)$.
+improves interval efficiency and bin-wise coverage stability without changing
+the conformal calibration layer.
 
-\subsection{Data-generating processes}
+\section{Diagnostic setup}
 
-Four 1D DGPs span Gaussian/non-Gaussian and homoscedastic/heteroscedastic regimes:
-\begin{description}
-  \item[\texttt{wsc\_gauss}.] Smooth heteroscedastic Gaussian, scale
-  $s(x) = 0.01 + 0.20(x-\pi)^2$.
-  \item[\texttt{gibbs\_s1}.] Heteroscedastic Gaussian, $s(x) = |\sin x|$.
-  Interior zero of $s$ at $x = 0, \pi$.
-  \item[\texttt{exp1}.] M/G/1 queue, $x \in [0.1, 0.9]$, boundary explosion
-  via Pollaczek--Khinchine.
-  \item[\texttt{nongauss\_A1L}.] Student-$t_3$ noise with scale
-  $s(x) = 0.01 + 0.20(x-\pi)^2$. Heavy-tailed; $\mathrm{SD}(Y \mid x) = s(x)\sqrt{3}$.
-\end{description}
+The existing outputs compare a fixed scalar bandwidth with an oracle adaptive
+bandwidth on four one-dimensional data-generating processes:
+\texttt{wsc\_gauss}, \texttt{gibbs\_s1}, \texttt{exp1}, and
+\texttt{nongauss\_A1L}. The reported quantities are marginal coverage, bin-wise
+coverage deviation, mean interval width, and Winkler interval score. Common
+random numbers across arms support paired comparisons.
 
-\subsection{Metrics}
+Because these outputs were produced before the current protocol lock, their role
+is limited to checking the scale-normalization mechanism. They should not be used
+as final evidence for the paper's finite-sample coverage claim.
 
-Marginal coverage $\hat{P}(Y \in [\hat L, \hat U])$ targets $1-\alpha = 0.9$.
-Conditional fairness uses bin-wise coverage on equal-frequency $x$-bins,
-reported as worst-bin and mean-bin $|c_{\mathrm{bin}} - (1-\alpha)|$.
-Width is $\mathbb{E}[U-L]$; the Winkler interval score
-$\mathrm{IS}(L,U,Y) = (U-L) + (2/\alpha)(L-Y)_+ + (2/\alpha)(Y-U)_+$ combines
-both.
-
-% ===========================================================================
-\section{Oracle adaptive bandwidth}\label{sec:oracle}
-% ===========================================================================
-
-We set $h(x) = c \cdot s(x)$ with the per-DGP oracle $s(x)$ defined above
-(for \texttt{nongauss\_A1L}, $s(x)$ is the Student-$t$ \emph{scale}, not its
-SD). Floors $h(x) \ge 10^{-3}$ avoid degenerate indicators where $s(x) = 0$.
-
-\subsection{Marginal validity}\label{sec:oracle-marginal}
-
-Both fixed-$h$ and oracle-$h(x)$ arms preserve split-CP marginal coverage
-across all four DGPs (Table~\ref{tab:exp1}). Empirical coverage lies within
-0.005 of the nominal 0.9 in every cell.
+\section{Fixed-bandwidth baseline}
 
 \begin{table}[h!]
 \centering
-\caption{Fixed-$h$ baseline. Target marginal coverage $1-\alpha = 0.90$. Cell format: median (SD across $K=50$ macroreps) for bin-wise stats; mean (SD) for width and IS.}
+\caption{Fixed-bandwidth diagnostic summary. Target marginal coverage is
+\(1-\alpha=0.90\).}
 \label{tab:exp1}
-\input{../../exp_adaptive_h/output_exp1/exp1_table.tex}
+\resizebox{\linewidth}{!}{%
+\input{../generated/tables/adaptive_h/exp1_fixed_reference_table.tex}
+}
 \end{table}
 
-\subsection{Paired interval score: oracle dominates fixed}\label{sec:oracle-paired}
+\section{Oracle adaptive bandwidth}
 
-Macrorep-paired comparison (common random numbers across arms) lets us
-quantify oracle's gain over fixed without macrorep-level noise inflation.
-Across the four DGPs, oracle $h(x)$ wins paired interval score in
-$98$--$100\%$ of macroreps (Table~\ref{tab:exp2}). The gain is
-sign-stable across DGPs and includes the homoscedastic-looking
-\texttt{wsc\_gauss}, where bin-wise worst deviation drops by $0.048$.
+The oracle arm sets \(h(x)=c\,s(x)\), with a small numerical floor where the
+scale approaches zero. This arm isolates the mechanism of response-scale
+normalization without introducing scale-estimation error.
+
+\subsection{Paired comparison with fixed bandwidth}
 
 \begin{table}[h!]
 \centering
-\caption{Oracle vs.\ fixed paired comparison. $\Delta$ is oracle minus fixed (negative is better). Width ratio $> 1$ indicates oracle pays width to gain conditional fairness.}
+\caption{Oracle minus fixed paired comparison. Negative interval-score
+differences favor the oracle arm.}
 \label{tab:exp2}
-\input{../../exp_adaptive_h/output_exp2/exp2_table.tex}
+\resizebox{\linewidth}{!}{%
+\input{../generated/tables/adaptive_h/exp2_oracle_vs_fixed_table.tex}
+}
 \end{table}
 
 \begin{figure}[h!]
 \centering
-\includegraphics[width=0.85\linewidth]{exp2_coverage_curves.png}
-\caption{Bin-wise coverage curves, oracle vs.\ fixed.}
+\includegraphics[width=0.85\linewidth]{exp2_oracle_vs_fixed_coverage.png}
+\caption{Bin-wise coverage curves for the oracle and fixed-bandwidth arms.}
 \label{fig:exp2}
 \end{figure}
 
-\subsection{Sensitivity to $c$: width--fairness trade-off}\label{sec:oracle-c}
-
-Fixing the DGP at \texttt{nongauss\_A1L} and sweeping
-$c \in \{0.3, 0.5, 1.0, 2.0\}$ shows the worst-bin deviation
-plateaus near $c \approx 1$--$2$ (Table~\ref{tab:exp3}); larger $c$ buys
-slightly better fairness at modest width cost. We use $c = 1$ as the default
-in $\S$\ref{sec:plugin}.
+\subsection{Sensitivity to the multiplier \(c\)}
 
 \begin{table}[h!]
 \centering
-\caption{$c$-sweep on \texttt{nongauss\_A1L}. \texttt{fixed} is the $h(x) = h_\star$ baseline; \texttt{c$k$} is oracle $h(x) = k \cdot s(x)$.}
+\caption{Oracle multiplier sweep on \texttt{nongauss\_A1L}.}
 \label{tab:exp3}
-\input{../../exp_adaptive_h/output_exp3/exp3_table.tex}
+\resizebox{\linewidth}{!}{%
+\input{../generated/tables/adaptive_h/exp3_oracle_c_sweep_table.tex}
+}
 \end{table}
 
 \begin{figure}[h!]
 \centering
-\includegraphics[width=0.7\linewidth]{exp3_metric_vs_c.png}
-\caption{Worst-bin deviation, mean width, and IS as functions of $c$.}
+\includegraphics[width=0.70\linewidth]{exp3_oracle_c_sweep_metrics.png}
+\caption{Worst-bin deviation, mean width, and interval score across oracle
+multiplier values.}
 \label{fig:exp3}
 \end{figure}
 
-% ===========================================================================
-\section{Plug-in adaptive bandwidth}\label{sec:plugin}
-% ===========================================================================
+\section{Interpretation}
 
-When $s(x)$ is unknown we replace it with a data-driven estimator built from
-Stage~1 raw data, and ask: how close to oracle performance can we get?
+The existing outputs provide diagnostic support for the oracle mechanism:
+normalizing the smooth-indicator bandwidth by the local response scale improves
+bin-wise stability and paired interval score relative to a fixed bandwidth in
+the tested settings. The appropriate manuscript claim remains narrower than the
+raw numerical pattern: these results motivate the adaptive rule and identify
+useful diagnostics, but final numerical claims require rerunning the fixed,
+oracle, and sample-SD plug-in arms under the locked protocol.
 
-\subsection{Estimator}\label{sec:plugin-est}
+\section{Next evidence step}
 
-For each Stage~1 site $x_i$, we compute a robust per-site scale
-\[
-  \hat\sigma_i \;=\; \frac{\mathrm{IQR}(Y_{i,1}, \ldots, Y_{i,r_0})}{1.349},
-\]
-where $1.349 = \Phi^{-1}(0.75) - \Phi^{-1}(0.25)$ ensures Fisher consistency
-to $\sigma$ under Gaussian noise (Silverman, 1986; Hampel, 1974).
-The point estimates $(x_i, \hat\sigma_i)$ are then smoothed by Nadaraya--Watson
-regression with a Gaussian kernel and Silverman bandwidth, yielding a
-callable $\hat\sigma(\cdot)$. The plug-in bandwidth is
-$h_{\mathrm{plug}}(x) = c \cdot \hat\sigma(x)$, floored at $10^{-3}$.
-
-\paragraph{Why IQR rather than sample SD?} Under Student-$t_\nu$ noise with
-$\nu \le 4$, the sample variance has \emph{infinite variance}: convergence
-of the SD estimator is dominated by the heaviest replicate. The robust scale
-$\mathrm{IQR}/1.349$ is quantile-based and has finite-variance asymptotics
-for any $\nu > 0$ (Hampel, 1974; Rousseeuw and Croux, 1993). In particular,
-for symmetric $t_\nu$ with scale $s$,
-\[
-  \frac{\mathrm{IQR}/1.349}{s} \xrightarrow{p} \kappa_\nu
-  \;:=\; \frac{q_{0.75}(t_\nu) - q_{0.25}(t_\nu)}{1.349},
-\]
-which equals $1$ in the Gaussian limit and $\kappa_3 \approx 1.134$ for
-$\nu = 3$.
-
-\paragraph{Finite-$r_0$ bias.} The $r_0$ replicates per site are small
-($r_0 = 10$ in our setup), and the empirical IQR computed from $r_0$ samples
-is itself biased: a Monte-Carlo evaluation of the linear-interpolation
-quantile estimator at $r_0 = 10$ gives
-$\mathbb{E}[\mathrm{IQR}_{r_0}/1.349] \approx 0.87 \cdot \sigma$ under
-Gaussian noise (i.e., a $\approx\!13\%$ shrinkage), and approximately the
-same multiplicative factor under $t_3$. The plug-in scale therefore tracks
-$c_{r_0}\!\cdot\!\sigma(x)$ rather than $\sigma(x)$ itself, where
-$c_{r_0} \to 1$ as $r_0 \to \infty$. As we show below, conformal calibration
-absorbs this constant offset into $\hat q$.
-
-\subsection{Gap to oracle}\label{sec:plugin-gap}
-
-Across budgets $B = n_0 r_0 \in \{50, 100, 250, 500\}$ with $r_0 = 10$ fixed,
-the absolute gap $|\mathrm{cov}_{\mathrm{plug}} - \mathrm{cov}_{\mathrm{oracle}}|$
-is already at the macrorep noise floor at the smallest $B = 50$, with no
-clear monotone decay across larger $B$ (Figure~\ref{fig:exp4a}). The
-practical reading is that conformal calibration absorbs estimation error in
-$\hat\sigma(\cdot)$ at this budget regime; the Gap-Theorem bound is loose
-relative to observed gaps.
-
-\begin{figure}[h!]
-\centering
-% Updated figure path will be exp_adaptive_h/output_exp4_iqr/ once IQR run completes.
-\includegraphics[width=0.8\linewidth]{exp4a_cov_gap_vs_budget.png}
-\caption{Coverage gap $|\mathrm{cov}_{\mathrm{plug}} - \mathrm{cov}_{\mathrm{oracle}}|$
-vs.\ Stage~1 budget $B$.}
-\label{fig:exp4a}
-\end{figure}
-
-\subsection{Behavior under heavy-tailed noise}\label{sec:plugin-tails}
-
-The ratio $\bar h_{\mathrm{plug}}(x) / \bar h_{\mathrm{oracle}}(x)$ has two
-sources of mismatch with the oracle scale: (i) the population-level constant
-$\kappa_\nu$ from $\S$\ref{sec:plugin-est} ($\kappa_2 = 1$,
-$\kappa_3 \approx 1.134$), and (ii) the finite-$r_0$ shrinkage
-$c_{r_0} \approx 0.87$. The combined target is therefore
-$c_{r_0} \cdot \kappa_\nu$: $\approx\! 0.87$ for the Gaussian DGPs and
-$\approx\! 0.99$ for $t_3$.
-
-Empirically, at the largest budget $B = 500$, the IQR plug-in tracks these
-predictions (Figure~\ref{fig:exp4b}, Table~\ref{tab:exp4-ablation}):
-$\bar h_{\mathrm{p}}/\bar h_{\mathrm{o}} \in \{0.85, 0.88, 0.84\}$ for the
-three Gaussian DGPs and $0.96$ for \texttt{nongauss\_A1L}. By contrast,
-a sample-SD plug-in shows a $\approx\!1.42$ ratio under $t_3$ that decreases
-slowly in $B$ but never reaches its formal target $\sqrt 3 \approx 1.73$,
-reflecting the infinite-variance asymptotics of sample variance for
-$\nu \le 4$. Despite the IQR offset, downstream coverage and interval-score
-metrics remain close to the oracle: the bin-wise coverage curves of the
-plug-in and oracle arms overlap to plotting precision across all four DGPs
-(Figure~\ref{fig:exp4b-cov}), confirming that the constant rescaling of
-$h$ is absorbed into $\hat q$ by conformal calibration.
-
-\begin{figure}[h!]
-\centering
-\includegraphics[width=0.95\linewidth]{exp4b_h_ratio_grid_4dgp.png}
-\caption{Plug-in vs.\ oracle bandwidth ratio
-$\bar h_{\mathrm{plug}}/\bar h_{\mathrm{oracle}}$ (median across query
-points and macroreps; shaded band $25$--$75\%$) as a function of Stage~1
-budget $B$, one panel per DGP. Dashed lines: population-level limits
-($1$ for Gaussian; $\kappa_3 \approx 1.134$ for $t_3$). Dotted lines:
-finite-$r_0$ prediction (population limit $\times \,c_{r_0}\!\approx\!0.87$
-at $r_0 = 10$).}
-\label{fig:exp4b}
-\end{figure}
-
-\begin{figure}[h!]
-\centering
-\includegraphics[width=0.95\linewidth]{exp4b_coverage_curves_grid_4dgp.png}
-\caption{Conditional coverage $\hat P(Y \in [\hat L, \hat U] \mid x \text{ in bin})$
-across $20$ equal-width $x$-bins at the largest budget $B = 500$, one panel
-per DGP. Plug-in (blue) and oracle (red) curves overlap; both are flatter
-than fixed-$h$ (gray dashed). Marginal coverages ($m$) are reported in each
-panel's legend.}
-\label{fig:exp4b-cov}
-\end{figure}
-
-\subsection{Ablation: sample SD vs.\ robust IQR estimator}\label{sec:plugin-ablation}
-
-We rerun the full Exp4 sweep ($K = 50$ macroreps, common random numbers)
-with the scale estimator swapped from $\mathrm{IQR}/1.349$ to
-$\mathrm{std}(Y_{i,\cdot})$ and report results at $B = 500$ in
-Table~\ref{tab:exp4-ablation}. Both estimators yield the same plug-in
-coverage to within $\le 0.001$, and the same coverage-gap distribution,
-reaffirming that conformal calibration absorbs scale offsets. The two
-estimators differ in their bandwidth-ratio behavior: sample-SD is closer
-to $1$ on Gaussian DGPs (no $\kappa_\nu$ offset) but produces an unstable
-$1.42$ ratio on $t_3$ (target $\sqrt 3$, not reached due to infinite-variance
-asymptotics). $\mathrm{IQR}/1.349$ shows a uniform $\approx\!0.87$
-finite-$r_0$ shrinkage (predicted by $\S$\ref{sec:plugin-est}) and matches
-its theoretical $t_3$ target within finite-sample noise. We default to
-$\mathrm{IQR}/1.349$ because it has finite-variance asymptotics for any
-$\nu > 0$ and a well-defined population limit even under heavy tails.
-
-\begin{table}[h!]
-\centering
-\caption{SD vs.\ IQR plug-in scale estimator at $B = 500$. Bandwidth ratio
-is median over $x$; coverage statistics are mean over macroreps; oracle
-column is shared between the two estimators by construction.}
-\label{tab:exp4-ablation}
-\input{../../exp_adaptive_h/output_exp4_iqr/exp4_ablation_sd_vs_iqr.tex}
-\end{table}
-
-% ===========================================================================
-\section{Discussion}
-% ===========================================================================
-
-Three findings stand out. First, replacing a CV-tuned scalar $h$ with an
-oracle $h(x) = c \cdot s(x)$ is a strict improvement on conditional
-performance: bin-wise worst deviation drops on every DGP and oracle wins
-the paired interval score in $98$--$100\%$ of macroreps, while marginal
-validity is preserved
-($\hat P(\text{cov}) - 0.9 < 0.005$ in every cell, $\S$\ref{sec:oracle}).
-
-Second, the plug-in $\hat\sigma(\cdot)$ built from Stage~1 raw data
-recovers the bulk of oracle's gain. The coverage gap to oracle is at the
-macrorep noise floor already at $B = 50$ and shows no monotone decay across
-larger $B$ ($\S$\ref{sec:plugin-gap}); for the budgets and DGPs studied
-here, the practical bottleneck is the calibration sample, not the scale
-estimator.
-
-Third, the scale estimator's behavior decomposes cleanly into a
-population-level limit and a finite-$r_0$ shrinkage. For
-$\mathrm{IQR}/1.349$, the population limit is $1$ on Gaussian noise and
-$\kappa_3 \approx 1.134$ on $t_3$; the finite-$r_0$ shrinkage at $r_0 = 10$
-is a $\approx\!13\%$ multiplicative factor that applies uniformly across
-DGPs. Conformal calibration absorbs this constant rescaling, which is why
-SD and IQR plug-ins yield indistinguishable coverage and IS even though
-their bandwidth ratios differ ($\S$\ref{sec:plugin-ablation}). The IQR
-estimator is preferable on theoretical grounds (finite-variance
-asymptotics for any $\nu > 0$), and is empirically immaterial on Gaussian
-benchmarks where SD is also valid.
-
-% ===========================================================================
-\bibliographystyle{plainnat}
-% \bibliography{adaptive_h}
-% Inline references:
-% Silverman 1986: Density Estimation for Statistics and Data Analysis, Chapman & Hall.
-% Hampel 1974: The Influence Curve and its Role in Robust Estimation, JASA 69(346):383--393.
-% Rousseeuw and Croux 1993: Alternatives to the MAD, JASA 88(424):1273--1283.
+The next paper-facing experiment should use the single implementable plug-in
+defined in
+\path{experiments/adaptive_h/planned_final_benchmark_spec.md}: compute the
+sample standard
+deviation at each replicated Stage~1 site, smooth those sitewise estimates by
+Nadaraya--Watson regression, and use \(h(x)=c\widehat s(x)\). The run should use
+the calibration and reporting rules in \texttt{PROTOCOL.md}, save raw scores and
+scale diagnostics, and produce a manifest connecting every table and figure to
+its source outputs.
 
 \end{document}

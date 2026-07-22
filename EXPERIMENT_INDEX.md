@@ -1,86 +1,86 @@
 # Experiment Index
 
-This file records the active project boundary for the current journal-scale
-CKME-DCP work. It is intentionally narrower than the full repository history.
+Last reviewed: 2026-07-22
 
-## Main paper line
+This index defines the experiment boundary for the current CKME-DCP paper. It
+separates runnable code from paper-ready evidence: an experiment may run
+successfully and still be a pilot, pre-protocol artifact, or historical
+reproduction.
 
-### `exp_adaptive_h/`
+## Main Paper Line
 
-Primary workflow for the current target-aware, scale-adaptive CKME-DCP paper.
-It uses the existing scalar-h core pipeline and evaluates adaptive `h(x)` at the
-experiment layer.
+### `experiments/adaptive_h/` -- active development
 
-The final adaptive-bandwidth benchmark specification is
-[`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md). The older
-`exp_adaptive_h/Exp_plan.md` is a working plan retained for history.
+Purpose: test whether response-scale normalization improves the CKME-DCP score
+and whether an implementable scale estimator approaches the oracle mechanism.
 
-Key commands:
+- Active estimator: per-site sample SD plus Nadaraya-Watson smoothing in
+  `sample_sd_nw_scale.py`.
+- Exp1--Exp3: current manuscript snapshot mechanism evidence, but pre-protocol.
+- Exp4: pre-protocol sample-SD/NW provenance; not final paper evidence.
+- Planned final run: specified but not yet implemented/produced in
+  `planned_final_benchmark_spec.md`.
+- Explicit exclusion: the IQR response-scale plug-in is archive-only.
+
+Canonical historical-workflow commands:
 
 ```bash
-python exp_adaptive_h/pretrain_params.py
-python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
-python exp_adaptive_h/summarize_exp4.py
-python exp_adaptive_h/plot_exp4a.py
-python exp_adaptive_h/plot_exp4b.py --simulator all
+python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
+python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
+python experiments/adaptive_h/plot_exp4_gaussian_gap.py
+python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
 ```
 
-The WSC-style Gaussian DGP is kept here as `wsc_gauss`; the old WSC reproduction
-runner is no longer an active experiment.
+Before sharing a conclusion, check `analysis/CURRENT_RESULTS.md` and
+`analysis/CLAIM_EVIDENCE_MAP.md`.
 
-## Supporting evidence
+## Supporting Evidence
 
-### `exp_design/`
+| Directory | Role | Evidence status | Main caution |
+|---|---|---|---|
+| `experiments/coverage_mechanism/` | Equal-tailed score and PCP portability studies | Supporting pilots | Scope is limited to tested DGPs/budgets |
+| `experiments/framing_validation/` | Scale, score-homogeneity, and epistemic diagnostics | Supporting/partial | Several gates use 5--20 macroreps; G4a missed one gate |
+| `experiments/design/` | Stage-1/Stage-2 allocation ablations | Pilot | Most existing comparisons use about 5 macroreps |
+| `experiments/conditional_coverage/` | Consistency and over-smoothing diagnostics | Supporting, older protocol | Oracle scale and 10 macroreps |
+| `experiments/nongauss/` | DCP-DR/hetGP comparison | Refresh required | Unequal completed benchmark counts |
+| `experiments/gibbs_compare/` | Gibbs/RLCP comparison | Historical supporting context | Old run sizes and archived third-party dependency |
+| `experiments/onesided/` | Quantile/one-sided diagnostics | Historical diagnostic | Small older runs; no final paper claim |
 
-Design-comparison and adaptive-allocation evidence. Use this to discuss the role
-of the Stage 2 site-selection score, not as the main adaptive-bandwidth result.
+Supporting evidence belongs in the main text only after its claim is promoted
+in the claim-evidence map. Otherwise route it to an appendix, diagnostic note,
+or archive.
 
-### `exp_nongauss/`
+## Separate or Exploratory Work
 
-Non-Gaussian benchmark evidence against R baselines. This folder still reflects
-the broader historical six-DGP plan, while the current simulator registry keeps
-the active Student-t A1 variants. Refresh this folder before treating it as a
-fully reproducible public workflow.
+### `experiments/mm1_feasibility/`
 
-### `exp_gibbs_compare/`
+KME/CKME feasibility for M/M/1 input uncertainty. It evaluates CDF and
+quantile error and does **not** run conformal prediction. Keep it separate from
+CKME-DCP coverage claims.
 
-Gibbs/RLCP comparison workflow. Useful as supporting context for heteroscedastic
-coverage behavior.
+### `experiments/stock/` (local, ignored)
 
-### `exp_conditional_coverage/`
+Exploratory empirical extension with local data dependencies. It is not a
+public reproducibility path until data provenance and benchmark design are
+reviewed.
 
-Consistency and diagnostics. The nested `_archive_old/` folder is legacy
-material and should not be part of the current paper narrative.
+## Compatibility Entrypoints
 
-### `exp_onesided/`
+The old root directories `exp_adaptive_h/`, `exp_conditional_coverage/`,
+`exp_design/`, `exp_gibbs_compare/`, `exp_nongauss/`, and `exp_onesided/`
+contain only lightweight wrappers for a few formerly documented commands. They
+do not own configs, result folders, or experiment implementations.
 
-Quantile-estimation diagnostics and one-sided score experiments. Treat as
-diagnostic support rather than the current main paper path.
+## Archive Boundary
 
-## Exploratory or local-only
+Retired work is indexed in `_archive/INDEX.md` and `_archive/CATALOG.tsv`.
+Important entries include:
 
-### `exp_stock/` (local-only, ignored)
+- `ARC-DIA-006`: retired IQR response-scale plug-in outputs;
+- `ARC-HIS-001`: WSC 2026 table-reproduction runner;
+- `ARC-REP-001`: third-party RLCP reproduction;
+- `ARC-WRT-001`: dissertation/defense derivative package.
 
-Exploratory real-data extension using archived returns data. It depends on
-local archived inputs and should not be presented as a public reproducibility
-path without a separate data/benchmark cleanup.
-
-### `ckme_dcp_mm1/`
-
-Feasibility-only KME/CKME input-uncertainty module for M/M/1 queueing outputs.
-It does not run conformal prediction and should not be used as evidence for the
-main CKME-DCP coverage claims.
-
-## Archived or legacy
-
-### `_archive/exp_wsc_2026/`
-
-Historical WSC 2026 reproduction scripts, config, table formatter, and partial
-local outputs. The `wsc_gauss` DGP remains registered in `Two_stage/` and is
-used by `exp_adaptive_h/`, but the WSC reproduction runner is no longer active.
-
-### `_archive/` and nested old experiment folders
-
-Superseded implementations, old reports, local outputs, and diagnostic trials.
-Do not use these folders as public-facing entrypoints unless they are refreshed
-and explicitly re-promoted.
+Do not execute or edit an archived experiment in place. Read its `ARCHIVE.md`,
+copy it to a new active experiment with a new run ID, then revalidate protocol,
+paths, dependencies, and data provenance.

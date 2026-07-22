@@ -1,0 +1,298 @@
+schema_version: 1
+updated: "2026-07-22"
+protocol_path: "PROTOCOL.md"
+registry_scope: "Numerical evidence currently present in the local repository"
+
+classification_definitions:
+  current_paper_snapshot: "Referenced by the active draft or paper-facing report; may still require a locked-protocol refresh."
+  supporting_or_pilot: "Diagnostic, ablation, benchmark, or feasibility evidence that must retain its run-size and scope qualification."
+  legacy_or_provenance: "Retained for history or older reproducibility; not eligible for a current claim."
+  missing_refresh: "Intended evidence has not yet been produced under the locked protocol."
+
+entries:
+  - id: "adaptive_h_exp1_fixed_reference"
+    classification: "current_paper_snapshot"
+    evidence_date: "2026-05-01"
+    date_basis: "artifact modification timestamp; no run manifest exists"
+    paper_role: "mechanism reference only"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      macroreplications_per_dgp: 50
+      dgps: ["wsc_gauss", "gibbs_s1", "exp1", "nongauss_A1L"]
+    source_paths:
+      - "experiments/adaptive_h/output_exp1/exp1_summary.csv"
+      - "experiments/adaptive_h/output_exp1/exp1_table.tex"
+      - "experiments/adaptive_h/output_exp1/exp1_coverage_curves.png"
+    verified_observations:
+      - "Mean marginal coverage ranges from 0.89666 to 0.90270 across the four DGPs."
+      - "The generated table reports nonzero worst-bin and mean-bin coverage deviations for every DGP."
+    limitations:
+      - "Predates the locked iid target-law calibration protocol."
+      - "No run manifest connects the artifact to a source revision."
+
+  - id: "adaptive_h_exp2_oracle_vs_fixed"
+    classification: "current_paper_snapshot"
+    evidence_date: "2026-05-01"
+    date_basis: "artifact modification timestamp; no run manifest exists"
+    paper_role: "main oracle mechanism table and figure in the current draft"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      paired_macroreplications_per_dgp: 50
+      dgps: ["wsc_gauss", "gibbs_s1", "exp1", "nongauss_A1L"]
+    source_paths:
+      - "experiments/adaptive_h/output_exp2/exp2_summary.csv"
+      - "experiments/adaptive_h/output_exp2/exp2_paired_deltas.csv"
+      - "experiments/adaptive_h/output_exp2/exp2_table.tex"
+      - "experiments/adaptive_h/output_exp2/exp2_coverage_curves.png"
+    verified_observations:
+      - "Median paired oracle-minus-fixed worst-bin changes are -0.0333, -0.0157, -0.0609, and -0.0210 in the source-file DGP order."
+      - "The fraction of macroreplications with better oracle interval score is 1.00, 1.00, 0.98, and 0.98."
+      - "Mean marginal coverage remains approximately 0.90 in both arms."
+      - "For exp1, oracle mean width exceeds fixed mean width by approximately 0.300."
+    limitations:
+      - "Oracle scale is unavailable in real applications."
+      - "Predates the locked protocol and does not validate the sample-SD/NW plug-in."
+
+  - id: "adaptive_h_exp3_multiplier_sweep"
+    classification: "current_paper_snapshot"
+    evidence_date: "2026-05-01"
+    date_basis: "artifact modification timestamp; no run manifest exists"
+    paper_role: "oracle multiplier sensitivity"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      macroreplications: 50
+      dgp: "nongauss_A1L"
+      c_values: [0.3, 0.5, 1.0, 2.0]
+    source_paths:
+      - "experiments/adaptive_h/output_exp3/exp3_summary.csv"
+      - "experiments/adaptive_h/output_exp3/exp3_table.tex"
+      - "experiments/adaptive_h/output_exp3/exp3_metric_vs_c.png"
+    verified_observations:
+      - "Worst-bin deviation is 0.105 at c=1 and 0.104 at c=2 in the generated table."
+      - "Mean interval score is 5.276 at c=1 and 5.251 at c=2."
+    limitations:
+      - "Single DGP and oracle scale only."
+      - "Supports a pragmatic default, not an optimality claim."
+
+  - id: "adaptive_h_exp4_prelock_sample_sd_nw"
+    classification: "legacy_or_provenance"
+    evidence_date: "2026-05-01"
+    date_basis: "artifact modification timestamp; no run manifest exists"
+    paper_role: "older plug-in diagnostic"
+    protocol_aligned: false
+    final_claim_eligible: false
+    source_paths:
+      - "experiments/adaptive_h/output_exp4/exp4_per_arm.csv"
+      - "experiments/adaptive_h/output_exp4/exp4_paired_summary.csv"
+      - "experiments/adaptive_h/output_exp4/exp4_summary_arm.csv"
+    verified_observations:
+      - "The output contains 50-macrorep summaries for fixed, plug-in, and oracle arms over budgets 50, 100, 250, and 500."
+      - "Per-point files contain interval and h_query fields but omit the final required raw_score and scale-diagnostic fields."
+    limitations:
+      - "No manifest."
+      - "DGP set and budget grid do not match the final adaptive-h specification."
+      - "Per-point output omits raw_score, s_hat, s_oracle, h_over_s, and group_bin."
+
+  - id: "adaptive_h_iqr_response_scale_retired"
+    classification: "legacy_or_provenance"
+    evidence_date: null
+    paper_role: "excluded method history"
+    protocol_aligned: false
+    final_claim_eligible: false
+    source_paths:
+      - "_archive/01_experiments/diagnostics/adaptive_h_iqr_response_scale/ARCHIVE.md"
+      - "_archive/01_experiments/diagnostics/adaptive_h_iqr_response_scale/artifacts/"
+    verified_observations:
+      - "The response-scale IQR plug-in has been retired and its artifacts were moved to the archive."
+    limitations:
+      - "Must not be used in current manuscript, advisor-update, or final-result summaries."
+
+  - id: "coverage_mechanism_score_choice_pilot"
+    classification: "supporting_or_pilot"
+    evidence_date: "2026-07-16"
+    date_basis: "dated report"
+    paper_role: "score-choice ablation"
+    protocol_aligned: true
+    final_claim_eligible: false
+    run_size:
+      macroreplications_per_budget: 50
+      budgets: [600, 2000]
+    source_paths:
+      - "experiments/coverage_mechanism/pilot_score_design/pilot_n50_b600.csv"
+      - "experiments/coverage_mechanism/pilot_score_design/pilot_n50_b2000.csv"
+      - "experiments/coverage_mechanism/pilot_score_design/report_pilot_score_design.tex"
+    verified_observations:
+      - "Optimized-score median paired width change is approximately -3 percent at both budgets."
+      - "Rare failures reverse the mean to +14.0 percent at budget 600 and +7.6 percent at budget 2000."
+      - "The reported more-than-20-percent-wider failure rate falls from 20 percent to 10 percent."
+    limitations:
+      - "Single skewed Gamma location model and two budgets."
+      - "Registered as supporting evidence rather than a current main-paper result."
+
+  - id: "coverage_mechanism_pcp_scale_pilot"
+    classification: "supporting_or_pilot"
+    evidence_date: "2026-07-16"
+    date_basis: "dated report"
+    paper_role: "portability evidence"
+    protocol_aligned: true
+    final_claim_eligible: false
+    run_size:
+      macroreplications_per_dgp: 50
+    source_paths:
+      - "experiments/coverage_mechanism/pilot_score_design/pilot_pcp_n50.csv"
+      - "experiments/coverage_mechanism/pilot_score_design/report_pilot_score_design.tex"
+      - "experiments/coverage_mechanism/pilot_score_design/pilot_pcp_fig.png"
+    verified_observations:
+      - "The report states that replication-based scale normalization compresses the ten-bin PCP coverage range 4.4-fold in the heteroscedastic test."
+      - "The report records a 16 to 20 percent set-size premium for PCP on the tested unimodal DGPs."
+    limitations:
+      - "PCP is a portability baseline, not the current paper method."
+      - "Registered as supporting evidence rather than a current main-paper result."
+
+  - id: "framing_validation_gates"
+    classification: "supporting_or_pilot"
+    evidence_date: "2026-07-07/2026-07-08"
+    date_basis: "experiment README"
+    paper_role: "mechanism and diagnostic validation"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      gate1_macroreplications: 50
+      gate2_macroreplications: 10
+      gate3_macroreplications: 5
+      gate4_macroreplications: 20
+    source_paths:
+      - "experiments/framing_validation/README.md"
+      - "experiments/framing_validation/output_gate1/gate1_correlations.csv"
+      - "experiments/framing_validation/output_gate2/gate2_ks_summary.csv"
+      - "experiments/framing_validation/output_gate3/gate3_summary.csv"
+      - "experiments/framing_validation/output_gate4a/gate4a_metrics.csv"
+      - "experiments/framing_validation/output_gate4b/gate4b_metrics.csv"
+    verified_observations:
+      - "Gate 3 reports separation indices 4.93 for width, 32.02 for oracle CDF L2, and 112.18 for u_tail in the bump arm."
+      - "The README labels Gate 4b a pass and Gate 4a partial; Gate 4a did not meet its CDF-error advantage gate."
+    limitations:
+      - "Standalone diagnostic DGPs and fewer than 50 macroreplications for Gates 2 through 4."
+
+  - id: "conditional_coverage_consistency"
+    classification: "supporting_or_pilot"
+    evidence_date: "2026-04-09"
+    date_basis: "diagnostic report date"
+    paper_role: "consistency and over-smoothing diagnostic"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      macroreplications: 10
+      sample_sizes: [64, 128, 512, 2048, 8192]
+      dgps: ["exp1", "exp2"]
+    source_paths:
+      - "experiments/conditional_coverage/output_consistency_fixed/summary_exp1.csv"
+      - "experiments/conditional_coverage/output_consistency_fixed/summary_exp2.csv"
+      - "experiments/conditional_coverage/output_consistency_adaptive_c2.00/summary_exp1.csv"
+      - "experiments/conditional_coverage/output_consistency_adaptive_c2.00/summary_exp2.csv"
+      - "experiments/conditional_coverage/report.md"
+      - "experiments/conditional_coverage/diagnostics/diag_report.md"
+    verified_observations:
+      - "All reported fixed-h L1, L2, and L3 summary errors decline between n=64 and n=8192 on both DGPs."
+      - "Under oracle h(x)=2 sigma(x), pre-CP tail-quantile errors remain approximately flat while post-CP coverage errors improve."
+    limitations:
+      - "Oracle scale, Gaussian DGPs, 10 macroreplications, and an older calibration design."
+
+  - id: "two_stage_design_ablations"
+    classification: "supporting_or_pilot"
+    evidence_date: null
+    paper_role: "Stage-1/Stage-2 allocation interpretation"
+    protocol_aligned: false
+    final_claim_eligible: false
+    run_size:
+      typical_macroreplications: 5
+    source_paths:
+      - "experiments/design/report.md"
+      - "experiments/design/output/expB_var_epi/gibbs_s1_d5/summary.csv"
+      - "experiments/design/output/expB_var_epi/gibbs_s1_d5_n500r10/summary.csv"
+      - "experiments/design/output/saturation/nongauss_A1L_raw/summary_agg.csv"
+      - "experiments/design/output/saturation/gibbs_s1_d5/summary_agg.csv"
+    verified_observations:
+      - "The report says one-dimensional ablations are effectively flat on interval score at the tested budgets."
+      - "The d=5 pilot reports approximately 2.1 percent interval-score gain for adaptive tail sampling at the smaller Stage-1 design and a tie at the larger design."
+    limitations:
+      - "Most comparisons use five macroreplications and are not paper-ready."
+
+  - id: "nongaussian_r_baselines"
+    classification: "legacy_or_provenance"
+    evidence_date: "2026-03-06/2026-04-11"
+    date_basis: "artifact modification timestamps"
+    paper_role: "historical benchmark context"
+    protocol_aligned: false
+    final_claim_eligible: false
+    source_paths:
+      - "experiments/nongauss/output/nongauss_compare_summary.csv"
+      - "experiments/nongauss/output/group_coverage_summary.csv"
+    verified_observations:
+      - "CKME has 50 macroreplications per DGP in the comparison summary."
+      - "DCP-DR and hetGP have unequal completed counts between 32 and 48 depending on DGP."
+    limitations:
+      - "Unequal completion counts and older public workflow require refresh before promotion."
+
+  - id: "gibbs_and_one_sided_older_outputs"
+    classification: "legacy_or_provenance"
+    evidence_date: "2026-03/2026-04"
+    date_basis: "artifact modification timestamps"
+    paper_role: "historical diagnostics"
+    protocol_aligned: false
+    final_claim_eligible: false
+    source_paths:
+      - "experiments/gibbs_compare/output/gibbs_compare_summary.csv"
+      - "experiments/gibbs_compare/output_adaptive_c2.00/gibbs_compare_summary.csv"
+      - "experiments/onesided/output/onesided_summary.csv"
+      - "experiments/onesided/output/onesided_tailprob_summary.csv"
+    verified_observations:
+      - "The Gibbs fixed summary uses 20 macroreplications and the adaptive summary uses 5."
+      - "The one-sided summary contains five macroreplications per simulator/side/method cell."
+    limitations:
+      - "Small run sizes and older protocol."
+
+  - id: "mm1_input_uncertainty_feasibility"
+    classification: "supporting_or_pilot"
+    evidence_date: "2026-06-15"
+    date_basis: "artifact modification timestamp"
+    paper_role: "separate KME/CKME feasibility"
+    protocol_aligned: false
+    final_claim_eligible: false
+    source_paths:
+      - "experiments/mm1_feasibility/README.md"
+      - "experiments/mm1_feasibility/results/smoke_kme_feas_summary.csv"
+    verified_observations:
+      - "The available summary is a two-seed smoke feasibility result."
+      - "The module evaluates CDF and quantile error, not conformal coverage."
+    limitations:
+      - "Out of scope for CKME-DCP coverage claims."
+
+  - id: "adaptive_h_final_sample_sd_nw"
+    classification: "missing_refresh"
+    evidence_date: null
+    paper_role: "critical main-paper implementable-method evidence"
+    protocol_aligned: null
+    final_claim_eligible: false
+    expected_paths:
+      - "experiments/adaptive_h/output_final_adaptive_h/manifest.json"
+      - "experiments/adaptive_h/output_final_adaptive_h/per_arm.csv"
+      - "experiments/adaptive_h/output_final_adaptive_h/paired_deltas.csv"
+      - "experiments/adaptive_h/output_final_adaptive_h/summary.csv"
+      - "experiments/adaptive_h/output_final_adaptive_h/per_point/"
+    acceptance_requirements:
+      - "Estimator is per-site sample SD plus Nadaraya-Watson smoothing; no IQR response-scale arm."
+      - "iid target-law calibration with one response per calibration input."
+      - "At least 50 macroreplications."
+      - "Final DGPs and budgets match experiments/adaptive_h/planned_final_benchmark_spec.md."
+      - "Manifest records seeds, settings, pretrained parameters, selected bw_factor, and source revision."
+      - "Per-point data include raw_score, s_oracle, s_hat, h_over_s, and group_bin."
+
+excluded_current_evidence:
+  - pattern: "_archive/01_experiments/diagnostics/adaptive_h_iqr_response_scale/**"
+    reason: "Retired IQR-based response-scale plug-in. Provenance only."
+  - pattern: "experiments/adaptive_h/output_exp4/**"
+    reason: "Pre-lock sample-SD/NW output without the final manifest and required diagnostics."

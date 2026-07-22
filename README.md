@@ -1,342 +1,231 @@
-# Two-Stage Adaptive Design with CKME
+# Two-Stage CKME-DCP Research Project
 
-> A two-stage adaptive experimental design framework for **conditional distribution estimation** and **uncertainty quantification** via Conditional Kernel Mean Embedding (CKME) with conformal prediction.
+This repository develops conditional distribution estimation and prediction
+intervals using Conditional Kernel Mean Embedding (CKME) and split conformal
+prediction. The active paper studies response-scale-adaptive indicator
+bandwidths while keeping the guarantee-bearing calibration sample iid from the
+target input law.
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![R](https://img.shields.io/badge/R-4.4%2B-276DC3)
+## Start Here
 
----
+| Question | File |
+|---|---|
+| What is the project doing now? | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) |
+| Which numerical conclusions are safe to share? | [`analysis/CURRENT_RESULTS.md`](analysis/CURRENT_RESULTS.md) |
+| Which claim is supported by which file? | [`analysis/CLAIM_EVIDENCE_MAP.md`](analysis/CLAIM_EVIDENCE_MAP.md) |
+| What estimator/evaluation rules are locked? | [`PROTOCOL.md`](PROTOCOL.md) |
+| Which experiments are active, supporting, or historical? | [`EXPERIMENT_INDEX.md`](EXPERIMENT_INDEX.md) |
+| How do I prepare an advisor update? | [`research_updates/README.md`](research_updates/README.md) |
+| How do I reproduce or validate code? | [`REPRODUCE.md`](REPRODUCE.md) |
 
-## Overview
+Current evidence supports the **oracle scale-normalization mechanism**. The
+final protocol-aligned comparison of the implementable sample-SD plus
+Nadaraya-Watson estimator is still pending. The former IQR response-scale
+plug-in is retired and exists only in the searchable archive.
 
-Standard experimental designs collect data uniformly, but for heteroscedastic simulators, variance is concentrated in a small region of the input space. This repository implements a two-stage adaptive design that:
+## Locked Method Boundary
 
-1. **Stage 1** — trains a nonparametric CDF model (CKME) on a small initial dataset to learn where uncertainty is high
-2. **Stage 2** — allocates additional replication budget to high-uncertainty sites, then calibrates a split conformal predictor to produce valid prediction intervals
+- Stage 1 fits a CKME conditional CDF model, with site-grouped CV when training
+  data contain replications.
+- The active scale estimator computes a sample standard deviation at each
+  replicated Stage-1 site, then smooths those values by Nadaraya-Watson
+  regression: `experiments/adaptive_h/sample_sd_nw_scale.py`.
+- Guarantee-bearing Stage-2 calibration uses iid inputs from the target law and
+  exactly one fresh response at each input (`method="iid"`, `r_1=1`).
+- Raw point-evaluated conformity scores define coverage. Monotone-projected CDF
+  intervals define reported width and interval score.
+- Design-selected/replicated Stage-2 modes remain available only for older
+  experiment reproduction and emit a warning.
 
-The resulting intervals achieve nominal marginal coverage with improved conditional (local) coverage and narrower widths in heteroscedastic regions compared to space-filling designs.
-
-### Method Summary
-
-| Component | Description |
-|-----------|-------------|
-| **CKME** | Estimates $\hat{F}(t \mid x)$ via kernel mean embedding with RBF kernel; tuned by CV on CRPS |
-| **S⁰ score** | Tail uncertainty: $\hat{q}_{1-\alpha/2}(x) - \hat{q}_{\alpha/2}(x)$; drives Stage 2 allocation |
-| **Adaptive h** | Bandwidth $h(x) = c \cdot \hat{\sigma}(x)$ (k-NN estimate) for uniform effective resolution |
-| **Split CP** | Calibration on $D_1$ gives finite-sample marginal coverage guarantee |
-
-Benchmarks: **DCP-DR** (distributional CP with quantile regression) and **hetGP** (heteroscedastic Gaussian process), both in R.
-
----
+See [`PROTOCOL.md`](PROTOCOL.md) for the precise rules and edge cases.
 
 ## Installation
+
+Python 3.10 or later is required.
 
 ```bash
 git clone https://github.com/JorjininMath/Two-stage-simple.git
 cd Two-stage-simple
 
-# Option A: conda (recommended for Python dependencies)
+# Core API plus experiment dependencies, installed from the src layout.
+python -m pip install -e ".[experiments]"
+```
+
+The Conda environment remains available as an alternative:
+
+```bash
 conda env create -f environment.yml
 conda activate ckme_env
-
-# Option B: pip only (no R benchmarks)
-pip install -r requirements.txt
+python -m pip install -e .
 ```
 
-**R dependencies** (for DCP-DR and hetGP benchmarks):
-```r
-install.packages(c("quantreg", "hetGP", "mvtnorm", "MASS"))
-```
+Optional R benchmarks require `hetGP` and `quantreg`. Their implementation and
+runner are isolated in [`benchmarks/dcp/`](benchmarks/dcp/).
 
----
-
-## Quick Start
+## Minimal API Example
 
 ```python
+from CKME.parameters import Params
 from Two_stage import run_stage1_train, run_stage2
-from Two_stage.design import generate_space_filling_design
-from Two_stage.sim_functions import get_experiment_config
-from CKME.parameters import ParamGrid
 
-# Stage 1: train CKME with cross-validated hyperparameters
-param_grid = ParamGrid(
-    ell_x_list=[0.3, 0.5, 1.0],
-    lam_list=[0.001, 0.01, 0.1],
-    h_list=[0.05, 0.1, 0.2],
-)
-result = run_stage1_train(
-    n_0=100, r_0=10,
-    simulator_func="exp2",   # 1D heteroscedastic Gaussian
-    param_grid=param_grid,
-    cv_folds=5,
+stage1 = run_stage1_train(
+    n_0=40,
+    r_0=5,
+    simulator_func="exp1",
+    params=Params(ell_x=0.5, lam=0.01, h=0.1),
     random_state=42,
 )
 
-# Candidate pool for Stage 2 site selection
-cfg = get_experiment_config("exp2")
-X_cand = generate_space_filling_design(
-    n=1000,
-    d=cfg["d"],
-    bounds=cfg["bounds"],
+stage2 = run_stage2(
+    stage1_result=stage1,
+    X_cand=None,          # not used by iid calibration
+    n_1=200,
+    r_1=1,
+    simulator_func="exp1",
+    method="iid",
+    alpha=0.1,
     random_state=43,
 )
 
-# Stage 2: adaptive allocation + conformal calibration
-stage2 = run_stage2(
-    stage1_result=result,
-    X_cand=X_cand,
-    n_1=200, r_1=10,
-    method="sampling",   # "lhs" | "sampling" | "mixed"
-    alpha=0.1,      # 90% prediction intervals
-)
-
-# Access the calibrated conformal predictor
-cp = stage2.cp
-print(f"Calibrated quantile: {cp.q_hat:.4f}")
+lower, upper = stage2.predict_interval([[0.4], [0.7]])
 ```
 
----
+Public imports remain `CKME`, `CP`, and `Two_stage` even though their source
+now lives under `src/`.
 
-## Current Paper Workflow
+## Main Adaptive-Bandwidth Workflow
 
-The current active paper line is the target-aware, scale-adaptive CKME-DCP
-workflow in [`exp_adaptive_h/`](exp_adaptive_h/). It keeps adaptive `h(x)` at
-the experiment/evaluation layer while leaving the core CKME/CP API stable.
-The final adaptive-bandwidth benchmark specification is
-[`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md).
+The current runnable Exp4 workflow uses per-site sample SD plus
+Nadaraya-Watson smoothing. Its existing outputs predate the locked protocol and
+are provenance rather than final paper evidence.
 
 ```bash
-# Tune fixed CKME hyperparameters used by the adaptive-h experiments
-python exp_adaptive_h/pretrain_params.py
-
-# Main plug-in vs oracle vs fixed adaptive-h experiment
-python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
-python exp_adaptive_h/summarize_exp4.py
-
-# Figures for the journal-scale adaptive-h story
-python exp_adaptive_h/plot_exp4a.py
-python exp_adaptive_h/plot_exp4b.py --simulator all
+python experiments/adaptive_h/pretrain_params.py
+python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
+python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
+python experiments/adaptive_h/plot_exp4_gaussian_gap.py
+python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
 ```
 
-The journal draft lives in
-[`manuscript/journal_scale_adaptive/`](manuscript/journal_scale_adaptive/):
+The not-yet-complete final workflow is specified in
+[`experiments/adaptive_h/planned_final_benchmark_spec.md`](experiments/adaptive_h/planned_final_benchmark_spec.md).
+Do not present that specification as already implemented.
+
+Old commands such as `python exp_adaptive_h/run_exp4_plugin.py` are lightweight
+compatibility wrappers. New scripts, configs, and outputs belong only under
+`experiments/`.
+
+## Research-to-Paper Workflow
+
+| Stage | Location | Rule |
+|---|---|---|
+| Capture an idea/question | `notes/inbox/` | Local working memory; not evidence |
+| Develop a plan or theory | `notes/planning/`, `notes/theory/` | Must not override the protocol |
+| Record a decision | `notes/decisions/` | Use a dated, descriptive filename |
+| Define/run an experiment | `experiments/<topic>/` | Keep config/spec/code together |
+| Record a run | `experiment_logs/` | Command, seed, settings, outputs, next action |
+| Verify and interpret | `analysis/` | Separate checked results from pilots/history |
+| Export paper assets | `manuscript/generated/` | Use the explicit hash-checked exporter |
+| Share an update | `research_updates/` | Include evidence status and limitations |
+| Write the paper | `manuscript/` | Read only stable generated assets |
+| Preserve retired work | `_archive/` | Index it; do not develop in place |
+
+Export or check the current paper-facing asset allowlist with:
 
 ```bash
-cd manuscript/journal_scale_adaptive
-pdflatex target_aware_scale_adaptive_ckme_cp.tex
+python tools/export_manuscript_assets.py
+python tools/export_manuscript_assets.py --check
 ```
-
-For the current active/supporting/archive experiment boundary, see
-[`EXPERIMENT_INDEX.md`](EXPERIMENT_INDEX.md).
-
----
-
-## Reproducing Experiments
-
-All scripts are run from the **project root**. Each experiment folder contains a `config.txt` with hyperparameters and a `pretrained_params.json` with CV-tuned values (re-run `pretrain_params.py` to regenerate).
-
-### Experiment 1 — Gibbs DGP Comparison (`exp_gibbs_compare/`)
-
-Compares CKME-CP (fixed h and adaptive h) against RLCP ([Hore & Barber 2023](https://arxiv.org/abs/2210.14461)) on two heteroscedastic DGPs from Gibbs et al.
-
-```bash
-# Local: run a quick test (1 macrorep)
-python exp_gibbs_compare/run_gibbs_compare.py --n_macro 1 --h_mode adaptive
-
-# Full run (50 macroreps), local
-python exp_gibbs_compare/run_gibbs_compare.py --n_macro 50 --h_mode adaptive \
-    --output_dir exp_gibbs_compare/output_adaptive_c2.0
-
-# HPC/SLURM (50 parallel array jobs)
-sbatch exp_gibbs_compare/run_all_gibbs_arc.sh    # CKME-CP
-sbatch exp_gibbs_compare/run_rlcp_arc.sh         # RLCP baseline
-
-# Aggregate + plot
-python exp_gibbs_compare/run_gibbs_compare.py --n_macro 50 --aggregate_only \
-    --output_dir exp_gibbs_compare/output_adaptive_c2.0
-python exp_gibbs_compare/plot_gibbs_compare.py \
-    --output_dir exp_gibbs_compare/output_adaptive_c2.0
-```
-
-### Archived WSC 2026 Reproduction
-
-The old WSC 2026 table-reproduction runner has been archived out of the active
-workflow. The `wsc_gauss` DGP remains registered in `Two_stage/sim_functions/`
-and is still used by `exp_adaptive_h/`, but current paper evidence should come
-from the adaptive-h workflow above rather than partial WSC runner outputs.
-
-### Experiment 2 — Non-Gaussian Noise (`exp_nongauss/`)
-
-Supporting non-Gaussian benchmark evidence against DCP-DR and hetGP. This
-folder still reflects the historical six-DGP plan, while the current simulator
-registry keeps the active Student-t A1 variants. Refresh this folder before
-treating it as a fully reproducible public workflow.
-
-### Experiment 3 — Conditional Coverage Consistency (`exp_conditional_coverage/`)
-
-Verifies that CKME-CP achieves asymptotic conditional coverage as $n \to \infty$.
-
-```bash
-python exp_conditional_coverage/pretrain_params.py
-python exp_conditional_coverage/run_consistency.py --n_macro 10
-python exp_conditional_coverage/plot_consistency.py
-```
-
-### Experiment 4 — Design Comparison (`exp_design/`)
-
-Compares S⁰ variants (tail-width vs. epistemic) and adaptive vs. LHS across sample sizes. Identifies the "inverted-U gain curve" regime behavior.
-
-```bash
-python exp_design/pretrain_params.py
-python exp_design/run_saturation_sweep.py --n_macro 20
-python exp_design/plot_adaptive_gain_curve.py
-```
-
-### Experiment 5 — One-Sided Quantile Estimation (`exp_onesided/`)
-
-Compares CKME (CDF-first) against quantile regression (QR) at the quantile estimation level, without conformal calibration.
-
-```bash
-python exp_onesided/exp2_quantile_error.py --n_macro 50
-python exp_onesided/exp2_sup_vs_tau.py
-```
-
-### Experiment 6 — Adaptive Bandwidth $h(x)$ (`exp_adaptive_h/`)
-
-Validates the **score-homogeneity** property of CKME-CP under adaptive bandwidth $h(x) = c \cdot \hat{\sigma}(x)$. Four sub-experiments:
-
-- **exp1** — baseline coverage/width across simulators (fixed $h$ from CV)
-- **exp2** — oracle $h(x)$ sweep, paired with fixed $h$
-- **exp3** — sensitivity to the scaling constant $c$
-- **exp4** — three-arm comparison: fixed / plug-in $\hat{\sigma}(x)$ / oracle $h(x)$, validating the **Gap Theorem** (decay of $|\mathrm{cov}_\text{plug} - \mathrm{cov}_\text{oracle}|$ with budget) on Gaussian DGPs and the score-homogeneity prediction on Student-t$_3$
-
-```bash
-python exp_adaptive_h/pretrain_params.py
-python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
-python exp_adaptive_h/summarize_exp4.py
-python exp_adaptive_h/plot_exp4a.py    # Gap Theorem decay (Gaussian DGPs)
-python exp_adaptive_h/plot_exp4b.py --simulator all
-```
-
-See [`exp_adaptive_h/spec.md`](exp_adaptive_h/spec.md) for the final benchmark
-specification. The older [`exp_adaptive_h/Exp_plan.md`](exp_adaptive_h/Exp_plan.md)
-is retained as a historical working plan.
-
----
-
-## Manuscript
-
-Paper-level writeup assets live in [`manuscript/`](manuscript/). The active
-journal draft is under
-[`manuscript/journal_scale_adaptive/`](manuscript/journal_scale_adaptive/).
-Auto-generated tables and figures stay in experiment output directories and are
-referenced from the manuscript.
-
-```bash
-cd manuscript/journal_scale_adaptive
-pdflatex target_aware_scale_adaptive_ckme_cp.tex
-```
-
----
 
 ## Project Structure
 
-```
+```text
 Two-stage-simple/
-│
-├── CKME/                        # Core model
-│   ├── ckme.py                  # CKMEModel: fit, predict_cdf, predict_quantile
-│   ├── parameters.py            # Params, ParamGrid dataclasses
-│   ├── kernels.py               # RBF kernel
-│   ├── indicators.py            # Smooth step functions (logistic / Gaussian CDF)
-│   ├── coefficients.py          # Cholesky linear solver
-│   ├── tuning.py                # k-fold CV with CRPS
-│   └── loss_functions/          # crps.py, pinball.py
-│
-├── CP/                          # Conformal prediction
-│   ├── cp.py                    # CP class: calibrate, predict_interval
-│   ├── calibration.py           # Nonconformity score calibration
-│   ├── scores.py                # abs_median, abs_cdf scores
-│   ├── interval.py              # Interval construction
-│   └── evaluation.py           # Coverage, width, interval score
-│
-├── Two_stage/                   # Pipeline orchestration
-│   ├── stage1_train.py          # run_stage1_train
-│   ├── stage2.py                # run_stage2
-│   ├── site_selection.py        # lhs / sampling / mixed strategies
-│   ├── s0_score.py              # S⁰ tail-uncertainty score
-│   ├── data_collection.py       # Simulator dispatch + data collection
-│   ├── design.py                # LHS design generation
-│   ├── evaluation.py            # Per-point and aggregate metrics
-│   ├── io.py                    # Save/load stage results
-│   ├── config_utils.py          # config.txt loader
-│   └── sim_functions/           # Simulator implementations
-│       ├── __init__.py          # Registry
-│       ├── exp1.py              # MG1 queue (1D, Gaussian)
-│       ├── exp2.py              # sin+x (1D, Gaussian)
-│       ├── sim_exp2_gauss.py    # WSC-style Gaussian DGP variants
-│       ├── sim_nongauss_A1.py   # Student-t noise (A1S / A1L)
-│       ├── sim_gibbs_s1.py      # Gibbs Setting 1: σ(x) = |sin(x)|
-│       └── sim_gibbs_s2.py      # Gibbs Setting 2: σ(x) = 2φ(x/1.5)
-│
-├── exp_gibbs_compare/           # Exp 1: CKME-CP vs RLCP
-├── exp_nongauss/                # Exp 2: Non-Gaussian noise
-├── exp_conditional_coverage/    # Exp 3: Coverage consistency
-├── exp_design/                  # Exp 4: Design comparison
-├── exp_onesided/                # Exp 5: One-sided quantile
-├── exp_adaptive_h/              # Exp 6: Adaptive bandwidth h(x)
-├── ckme_dcp_mm1/                # Feasibility-only KME/CKME M/M/1 input-uncertainty module
-│
-├── EXPERIMENT_INDEX.md          # Active/supporting/archive experiment boundary
-├── paper/                       # Dated shareable PDF snapshots
-├── manuscript/                  # Paper-level tex writeup
-│   ├── journal_scale_adaptive/  # Current journal draft source
-│   └── reports/                 # Per-experiment .tex reports
-├── _archive/                    # Tracked public archive entries plus ignored local history
-│
-├── dcp_r.R                      # R: DCP-DR + hetGP benchmarks
-├── run_benchmarks_one_case.R    # R: single-case benchmark runner
-├── submit_all.sh                # HPC: submit all SLURM jobs
-├── environment.yml              # Conda environment spec
-└── requirements.txt             # Pip dependencies
+├── PROJECT_STATUS.md             # one-page operational update
+├── PROJECT_HISTORY.md            # dated completed work
+├── PROTOCOL.md                   # locked estimator/evaluation rules
+├── EXPERIMENT_INDEX.md           # active/supporting/archive boundary
+├── REPRODUCE.md                  # validation and reproduction commands
+├── src/
+│   ├── CKME/                     # conditional CDF estimator
+│   ├── CP/                       # conformal calibration and intervals
+│   ├── Two_stage/                # Stage 1/Stage 2 orchestration
+│   └── project_support/          # stable project-relative path helpers
+├── experiments/
+│   ├── adaptive_h/               # main paper mechanism and planned final run
+│   ├── coverage_mechanism/       # score/mechanism pilots
+│   ├── framing_validation/       # epistemic/aleatoric diagnostics
+│   ├── design/                   # design and allocation ablations
+│   ├── conditional_coverage/     # consistency diagnostics
+│   ├── nongauss/                 # R benchmark comparison
+│   ├── gibbs_compare/            # Gibbs/RLCP supporting comparison
+│   ├── onesided/                 # quantile and one-sided diagnostics
+│   ├── mm1_feasibility/          # separate input-uncertainty feasibility
+│   └── stock/                    # local exploratory extension (ignored)
+├── analysis/                     # result registry and claim-evidence map
+├── experiment_logs/              # local run records and templates
+├── notes/                        # local ideas/plans/theory/decisions
+├── manuscript/
+│   ├── journal_scale_adaptive/   # active LaTeX manuscript
+│   ├── reports/                  # paper-facing experiment reports
+│   ├── generated/                # exported tables/figures with provenance
+│   └── advisor_feedback/         # private returned-version intake workflow
+├── research_updates/             # advisor/coauthor update templates/packages
+├── paper/
+│   ├── current/                  # at most one approved shareable PDF
+│   └── archive/YYYY-MM/          # superseded shared snapshots
+├── benchmarks/                   # external benchmark implementations
+├── hpc/                          # top-level SLURM dispatcher
+├── tools/                        # asset/provenance utilities
+├── tests/                        # core import/path/pipeline smoke tests
+└── _archive/                     # indexed retired work and manifests
 ```
 
----
+The old top-level `exp_*` directories contain compatibility wrappers only and
+are not sources of experiment code or results.
 
-## Simulators
+## Advisor-Returned Versions
 
-| Name | Description | Dim | Noise type |
-|------|-------------|-----|------------|
-| `exp1` | MG1 queue: $\zeta(x)=1.5x^2/(1-x)$ | 1D $[0.1, 0.9]$ | Heteroscedastic Gaussian |
-| `exp2` | $f(x)=x+\sin(\pi x)$ | 1D $[0, 2\pi]$ | Heteroscedastic Gaussian |
-| `wsc_gauss` | $f(x)=e^{x/10}\sin x$, $\sigma(x)=0.01+0.2(x-\pi)^2$ | 1D $[0,2\pi]$ | Heteroscedastic Gaussian |
-| `nongauss_A1S/L` | Same mean/scale as `wsc_gauss`, Student-t ($\nu=10$ or $3$) | 1D $[0,2\pi]$ | Student-t |
-| `gibbs_s1` | $Y=0.5x+\sigma(x)\varepsilon$, $\sigma(x)=\lvert\sin x\rvert$ | 1D | Heteroscedastic Gaussian |
-| `gibbs_s2` | Same form, $\sigma(x)=2\varphi(x/1.5)$ | 1D | Heteroscedastic Gaussian |
+Put each returned manuscript in a private dated round:
 
-The archived non-Gaussian Gamma and mixture variants are not part of the current
-active simulator registry.
+```text
+manuscript/advisor_feedback/rounds/YYYY-MM-DD-R01-short-label/
+```
 
----
+Keep the returned file unchanged under `received/`, record its checksum and the
+exact sent snapshot in `manifest.yaml`, and integrate accepted edits into the
+active manuscript using the checklist/log. See
+[`manuscript/advisor_feedback/README.md`](manuscript/advisor_feedback/README.md).
+
+## Archive and Career OS
+
+Use [`_archive/INDEX.md`](_archive/INDEX.md) for a human-readable inventory and
+[`_archive/CATALOG.tsv`](_archive/CATALOG.tsv) for filtering. Every archived
+item has an `ARCHIVE.md`; large payloads remain local but are listed in the file
+manifest. Nothing was permanently deleted in the 2026-07-22 reorganization.
+
+`PROJECT_STATUS.md` is authoritative for this project. Its stable
+`career-os:*` markers are designed for a future one-way importer into Career
+OS. Until that importer exists, update Career OS manually; Career OS should not
+write scientific claims back into this repository.
+
+The machine-readable handoff is already available without changing Career OS:
+
+```bash
+python tools/export_project_status.py --check
+python tools/export_project_status.py
+```
 
 ## Citation
 
-If you use this code in your research, please cite:
-
 ```bibtex
-@misc{ckme2025,
+@misc{ckme_two_stage,
   author = {Jin Zhao},
-  title  = {Two-Stage Adaptive Experimental Design with Conditional Kernel Mean Embedding},
-  year   = {2025},
+  title  = {Two-Stage Conditional Kernel Mean Embedding and Conformal Prediction},
+  year   = {2026},
   url    = {https://github.com/JorjininMath/Two-stage-simple}
 }
 ```
 
-*(Will be updated with journal reference upon publication.)*
-
----
-
-## License
-
-Apache 2.0 — see [LICENSE](LICENSE).
+The citation will be replaced by the journal record when available. This
+project is licensed under Apache 2.0; see [`LICENSE`](LICENSE).

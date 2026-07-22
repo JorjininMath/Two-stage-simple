@@ -28,9 +28,9 @@ Use one subfolder per experiment family:
 
 ```text
 experiment_logs/
-  exp_adaptive_h/
+  adaptive_h/
     2026-06-24_existing_dgp_diagnostics.md
-  ckme_dcp_mm1/
+  mm1_feasibility/
     2026-06-15_kme_feasibility.md
   templates/
     daily_experiment_report.md

@@ -12,10 +12,7 @@
 \usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
 
 \graphicspath{
-  {../../exp_adaptive_h/output_exp1/}
-  {../../exp_adaptive_h/output_exp2/}
-  {../../exp_adaptive_h/output_exp3/}
-  {../../exp_adaptive_h/output_exp4_iqr/}
+  {../generated/figures/adaptive_h/}
 }
 
 \newtheorem{assumption}{Assumption}
@@ -42,16 +39,23 @@
 \newcommand{\op}{o_{\mathbb P}}
 \newcommand{\Op}{O_{\mathbb P}}
 
+% Temporarily hide numerical evidence while experiment results are being checked.
+\newif\ifincludeexperiments
+\includeexperimentsfalse
+
 \title{Target-Aware and Scale-Adaptive Distributional Conformal Prediction\\
 for Stochastic Simulation Outputs}
 \author{Jin Zhao \and Xi Chen \and Meimei Liu}
-\date{Draft: May 10, 2026}
+\date{July 21, 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Predictive inference for stochastic simulation must provide reliable coverage for future simulation outputs while remaining informative under heteroscedastic and non-Gaussian response distributions. Distributional conformal prediction (DCP) is appealing because it calibrates a score based on an estimated conditional cumulative distribution function (CDF), but the coverage statement is only meaningful after specifying the input distribution over which future simulation scenarios are evaluated. We formulate simulation-output prediction relative to a user-specified target input distribution \(q_X\), equivalently the target joint law \(P^q_{XY}(dx,dy)=q_X(dx)P_{Y\mid X=x}(dy)\). This notation unifies ordinary global-domain coverage, region-of-interest coverage, and fixed-target-set average coverage. For the matched target-calibration setting, split conformal prediction gives finite-sample marginal validity under \(P^q_{XY}\). To obtain efficient intervals under heterogeneous simulation noise, we use conditional kernel mean embeddings (CKME) to estimate the full conditional output law through smoothed indicator functions and introduce a scale-adaptive bandwidth \(h(x)=c\widehat s(x)\), where \(\widehat s(x)\) estimates the local response scale from training replications. Under a heteroscedastic location-scale model, oracle adaptive smoothing \(h(x)=c s(x)\) removes the \(x\)-dependent standardized smoothing distortion created by a fixed bandwidth and restores homogeneity of the smoothed DCP score. Empirically, oracle adaptive smoothing improves worst-bin coverage deviation and paired interval score across Gaussian, queueing, and heavy-tailed benchmarks, while a robust plug-in estimator based on IQR smoothing closely tracks the oracle and preserves nominal marginal coverage.
+Predictive inference for stochastic simulation must provide reliable coverage for future simulation outputs while remaining informative under heteroscedastic and non-Gaussian response distributions. Distributional conformal prediction (DCP) is appealing because it calibrates a score based on an estimated conditional cumulative distribution function (CDF), but the coverage statement is only meaningful after specifying the input distribution over which future simulation scenarios are evaluated. We formulate simulation-output prediction relative to a user-specified target input distribution \(q_X\), equivalently the target joint law \(P^q_{XY}(dx,dy)=q_X(dx)P_{Y\mid X=x}(dy)\). This notation unifies ordinary global-domain coverage, region-of-interest coverage, and fixed-target-set average coverage. For the matched target-calibration setting, split conformal prediction gives finite-sample marginal validity under \(P^q_{XY}\). To obtain efficient intervals under heterogeneous simulation noise, we use conditional kernel mean embeddings (CKME) to estimate the full conditional output law through smoothed indicator functions and introduce a scale-adaptive bandwidth \(h(x)=c\widehat s(x)\), where \(\widehat s(x)\) estimates the local response scale from training replications. Under a heteroscedastic location-scale model, oracle adaptive smoothing \(h(x)=c s(x)\) removes the \(x\)-dependent standardized smoothing distortion created by a fixed bandwidth and restores homogeneity of the smoothed DCP score.
+\ifincludeexperiments
+Empirically, oracle adaptive smoothing improves worst-bin coverage deviation and paired interval score across Gaussian, queueing, and heavy-tailed benchmarks while preserving nominal marginal coverage.
+\fi
 \end{abstract}
 
 \section{Introduction}
@@ -80,7 +84,9 @@ The contributions are as follows.
   \item We introduce scale-adaptive CKME-DCP. It replaces a single smooth-indicator bandwidth with \(h(x)=c\widehat s(x)\), where \(\widehat s(x)\) is learned from training replications and smoothed across input space.
   \item We separate validity from efficiency. Split conformal validity is estimator-agnostic and follows when calibration and target samples are exchangeable under \(q_X\). Uniform CDF error transfers to DCP score and threshold error, affecting interval efficiency and group-conditional behavior.
   \item We show that, under a heteroscedastic location-scale model, oracle adaptive smoothing \(h(x)=c s(x)\) removes the \(x\)-dependent standardized smoothing ratio \(h/s(x)\) induced by fixed smoothing and restores homogeneity of the smoothed-oracle DCP score.
-  \item We report numerical evidence from the current simulation suite. Oracle adaptive smoothing improves worst-bin coverage deviation and paired interval score on all considered data-generating processes. A robust IQR-based plug-in estimator closely tracks the oracle even under Student-\(t_3\) noise.
+  \ifincludeexperiments
+  \item We report numerical evidence from the current simulation suite. Oracle adaptive smoothing improves worst-bin coverage deviation and paired interval score on all considered data-generating processes.
+  \fi
 \end{enumerate}
 
 \section{Related Work}
@@ -172,7 +178,7 @@ The matched target-calibration regime is the main regime of this paper. It leads
   \quad\Longrightarrow\quad
   \Pp\{Y_\star\in\widehat C(X_\star)\}\ge 1-\alpha .
 \]
-The statement is intentionally marginal under \(q_X\). It is not a pointwise conditional guarantee, and it does not claim validity for target distributions that were not used in calibration. This boundary is important for the EV charging case study in Section~\ref{sec:ev-case}, where \(q_X\) is a high-utilization region rather than the whole station-design space.
+The statement is intentionally marginal under \(q_X\). It is not a pointwise conditional guarantee, and it does not claim validity for target distributions that were not used in calibration. This boundary also explains why bin-wise coverage, when reported, should be interpreted as a diagnostic rather than as a separate finite-sample guarantee.
 
 \begin{remark}[Why keep \(p_{\mathrm{tr}}\) separate?]
 If \(p_{\mathrm{tr}}\) is too far from \(q_X\), the CKME estimator may be inaccurate in the target region, producing wide or unstable intervals after calibration. This is an efficiency and estimation problem, not a conformal validity problem, as long as the calibration and target pairs are exchangeable. In practice, the training design should cover the support of \(q_X\) well enough for conditional distribution estimation, while the calibration design should match \(q_X\) for validity.
@@ -241,7 +247,7 @@ This guarantee does not require \(\widehat F\) to be correctly specified.
 Proposition~\ref{prop:target-validity} states the validity line of the paper. CKME and adaptive smoothing are not needed for marginal conformal validity. They affect the quality, shape, and conditional efficiency of the resulting intervals.
 
 \begin{remark}[When calibration and target distributions differ]
-If calibration inputs follow \(p_{\mathrm{cal}}\) but target inputs follow \(q_X\), unweighted split conformal calibration is generally calibrated for \(p_{\mathrm{cal}}\), not for \(q_X\). Under support overlap, weighted conformal calibration can be used with weights proportional to \(q_X(x)/p_{\mathrm{cal}}(x)\) \cite{tibshirani2019}. This paper treats the weighted version as part of the target-aware formulation, while the main experiments use matched calibration and target distributions.
+If calibration inputs follow \(p_{\mathrm{cal}}\) but target inputs follow \(q_X\), unweighted split conformal calibration is generally calibrated for \(p_{\mathrm{cal}}\), not for \(q_X\). Under support overlap, weighted conformal calibration can be used with weights proportional to \(q_X(x)/p_{\mathrm{cal}}(x)\) \cite{tibshirani2019}. This paper treats the weighted version as part of the target-aware formulation, while the main theorem line focuses on matched calibration and target distributions.
 \end{remark}
 
 \begin{remark}[Fixed target inputs]
@@ -341,15 +347,17 @@ Thus a fixed \(h\) can oversmooth low-noise regions, where \(h/s(x)\) is large, 
 \end{equation}
 where \(c>0\) is a global multiplier and \(\widehat s(x)\) is estimated from training-stage simulation replications. The goal is to make \(h(x)/s(x)\) approximately stable across inputs.
 
-In the current implementation, the training data are collected at design sites \(x_i\) with \(r_0\) replications per site. At each site we compute the robust scale estimate
+In the current implementation, the training data are collected at design sites \(x_i\) with \(r_0\) replications per site. At each site we compute the sample standard deviation
 \[
-  \widehat s_i=\frac{\mathrm{IQR}(Y_{i1},\ldots,Y_{ir_0})}{1.349},
+  \widehat s_i=
+  \left\{\frac{1}{r_0-1}\sum_{j=1}^{r_0}
+  \bigl(Y_{ij}-\overline Y_i\bigr)^2\right\}^{1/2},
 \]
 then smooth \((x_i,\widehat s_i)\) over \(\Xcal\) using Nadaraya-Watson regression with a Gaussian kernel. The resulting \(\widehat s(x)\) is floored to avoid degenerate bandwidths, and \(h(x)=c\widehat s(x)\) is used both for calibration scores and for prediction-set inversion.
 
-The IQR estimator is not the only possible scale estimator. A sample standard deviation is efficient under Gaussian noise, but it can be unstable when replications are heavy-tailed or when a small number of extreme simulation outputs occur. A median absolute deviation estimator is another robust option. We use IQR because it has a simple Gaussian calibration constant, is stable for the Student-\(t\) example in the experiments, and is easy to compute from site-level replications. Since split conformal calibration absorbs moderate multiplicative scale errors, the purpose of \(\widehat s(x)\) is not to estimate \(s(x)\) perfectly. Its purpose is to remove large systematic changes in the standardized smoothing ratio across the input space.
+The sample standard deviation estimates the conditional response standard deviation directly. Under a location-scale model with an input-invariant standardized noise law, it is a constant multiple of \(s(x)\), so the adaptive rule still removes systematic variation in the standardized smoothing ratio across the input space. The purpose of \(\widehat s(x)\) is to learn the local scale pattern from designed replications rather than to estimate every feature of the conditional output distribution.
 
-The multiplier \(c\) controls the global amount of smoothing after scale normalization. When \(c\) is too small, the smoothed indicator becomes nearly discontinuous and the CKME CDF estimate can be noisy. When \(c\) is too large, the CDF estimate is biased toward an overly diffuse distribution and the DCP score loses resolution. In the experiments, a small sweep over \(c\) is used to verify that \(c=1\) is a stable default. A more elaborate implementation could tune \(c\) by cross-validation on a distributional loss, but we keep the default simple because the main contribution is the input-dependent scale normalization rather than another scalar tuning routine.
+The multiplier \(c\) controls the global amount of smoothing after scale normalization. When \(c\) is too small, the smoothed indicator becomes nearly discontinuous and the CKME CDF estimate can be noisy. When \(c\) is too large, the CDF estimate is biased toward an overly diffuse distribution and the DCP score loses resolution. A small sweep over \(c\) can be used to check whether \(c=1\) is a stable default. A more elaborate implementation could tune \(c\) by cross-validation on a distributional loss, but we keep the default simple because the main contribution is the input-dependent scale normalization rather than another scalar tuning routine.
 
 \subsection{Prediction-set construction}
 
@@ -376,11 +384,11 @@ The full scale-adaptive CKME-DCP procedure is:
 
 The implementation follows the training-calibration split used in the WSC version of CKME-DCP, with one change: the output-side bandwidth is evaluated as a function of the prediction input. The CKME hyperparameters \((\ell_x,\lambda)\) are selected using the training data. The fixed-bandwidth baseline also tunes a scalar \(h\). The adaptive version replaces this scalar with \(h(x)=c\widehat s(x)\), using the same CKME input weights \(a(x)\). Thus the computationally expensive matrix solve for \((K_X+n_{\mathrm{tr}}\lambda I)^{-1}\) is unchanged.
 
-Prediction-set inversion is performed on a response grid \(\Tcal\). In one-dimensional output settings this is straightforward: evaluate the DCP score \(S_{\widehat F}(x,t)\) for every \(t\in\Tcal\) and return the grid values whose scores are below the calibrated threshold. The resulting set may be an interval or a union of intervals when the estimated CDF is imperfect. In the current numerical experiments we summarize it by the smallest interval covering the accepted grid values, which is the quantity used for coverage, width, and interval score. This convention matches the simulation-output setting where the user usually wants a one-dimensional prediction interval.
+Prediction-set inversion is performed on a response grid \(\Tcal\). In one-dimensional output settings this is straightforward: evaluate the DCP score \(S_{\widehat F}(x,t)\) for every \(t\in\Tcal\) and return the grid values whose scores are below the calibrated threshold. The resulting set may be an interval or a union of intervals when the estimated CDF is imperfect. For reporting one-dimensional prediction intervals, we summarize it by the smallest interval covering the accepted grid values. This convention matches the simulation-output setting where the user usually wants a one-dimensional prediction interval.
 
 For repeated simulation outputs, there are two equivalent data views. One may treat each replication as an input-output pair \((x_i,Y_{ij})\), which is convenient for CKME fitting, while also preserving the site structure to estimate \(\widehat s_i\) from the replications at each \(x_i\). The local-scale estimator therefore uses the replication structure, but the conformal calibration scores are computed at the individual output level. The calibration sample is independent of the training sample used to fit CKME and estimate \(\widehat s\).
 
-The method has three distinct tuning components. The input kernel length scale controls how information is shared across neighboring simulation inputs. The regularization parameter controls the stability of the CKME weights. The output bandwidth controls smooth-indicator resolution. The proposed adaptive rule changes only the third component. This is important for interpreting the experiments: improvement over fixed-bandwidth CKME-DCP is evidence that the response-scale smoothing correction matters, rather than evidence that the entire CKME estimator has been replaced.
+The method has three distinct tuning components. The input kernel length scale controls how information is shared across neighboring simulation inputs. The regularization parameter controls the stability of the CKME weights. The output bandwidth controls smooth-indicator resolution. The proposed adaptive rule changes only the third component. This separation is important for interpreting future ablations: improvement over fixed-bandwidth CKME-DCP would be evidence that the response-scale smoothing correction matters, rather than evidence that the entire CKME estimator has been replaced.
 
 \section{Theory}
 \label{sec:theory}
@@ -604,6 +612,7 @@ in probability.
 
 The theorem does not claim finite-sample pointwise conditional coverage, which is impossible in general without stronger assumptions. It states that, in the location-scale regime targeted here, adaptive smoothing plus uniform CKME CDF consistency can make DCP scores asymptotically homogeneous over fixed finite input partitions.
 
+\ifincludeexperiments
 \section{Numerical Evidence}
 \label{sec:experiments}
 
@@ -626,35 +635,9 @@ We report marginal coverage, mean width, Winkler interval score, and bin-wise co
 
 The numerical section is organized around the paper's main question rather than around an exhaustive leaderboard. The key ablation is fixed-bandwidth CKME-DCP versus scale-adaptive CKME-DCP. Both methods use the same training data, the same calibration data, the same CKME input kernel family, and the same conformal calibration rule. The difference is the output-side smooth-indicator bandwidth. This paired design isolates the effect of \(h(x)=c\widehat s(x)\).
 
-For a full journal version, the benchmark set should contain three layers:
-\begin{description}[leftmargin=1.7em]
-  \item[Internal CKME ablations.] Fixed-bandwidth CKME-DCP, oracle scale-adaptive CKME-DCP, and plug-in scale-adaptive CKME-DCP. These arms directly test the proposed mechanism.
-  \item[Conformal competitors.] DCP-DR and CQR are natural external conformal baselines. DCP-DR estimates the conditional distribution through threshold-wise distribution regression, while CQR estimates conditional quantiles. These methods are useful because they ask whether CKME-DCP is competitive with established conformal approaches that do not rely on CKME smooth indicators.
-  \item[Simulation UQ baselines.] Heteroscedastic GP or stochastic-kriging intervals are useful for the simulation audience. When reported without conformal calibration, they should be described as model-based uncertainty intervals rather than distribution-free conformal intervals. A conformalized version can also be included if implementation time permits.
-\end{description}
+We therefore compare three CKME-DCP variants. The fixed arm uses a scalar smooth-indicator bandwidth selected by cross-validation. The oracle adaptive arm uses \(h(x)=c s(x)\) and isolates the effect of perfect response-scale normalization. The plug-in adaptive arm uses \(h(x)=c\widehat s(x)\), where \(\widehat s(x)\) is estimated from Stage-1 replications. This design separates the mechanism question from broader benchmark questions: the experiments test whether local response-scale normalization improves the DCP score while preserving the same split-conformal calibration layer.
 
-The current draft includes the internal CKME ablations because they are the evidence needed for the scale-adaptive bandwidth claim. The external conformal and simulation-UQ baselines should be added once their implementations are stable enough to avoid distracting from the main contribution. In the EV case study, the same principle applies: the first comparison should be fixed versus scale-adaptive CKME-DCP under the same ROI target distribution. External baselines can then be used to show that the proposed method is not merely improving over a weak CKME variant.
-
-\begin{table}[t]
-\centering
-\caption{Benchmark roles for the full journal version. The present draft has numerical results for the internal CKME ablations; the remaining rows define the planned comparison structure.}
-\label{tab:benchmark-roles}
-\begin{tabular}{
->{\raggedright\arraybackslash}p{0.22\linewidth}
->{\raggedright\arraybackslash}p{0.31\linewidth}
->{\raggedright\arraybackslash}p{0.35\linewidth}}
-\toprule
-Method class & Examples & Role in the paper \\
-\midrule
-Internal CKME ablation & Fixed CKME-DCP, oracle adaptive CKME-DCP, plug-in adaptive CKME-DCP & Isolate the effect of scale-adaptive smooth-indicator bandwidths. \\
-External conformal & DCP-DR, CQR, residual CP & Compare against conformal methods with different score constructions. \\
-Simulation UQ & hetGP, stochastic kriging, conformalized GP intervals & Connect to the simulation metamodeling literature and distinguish model-based from conformal uncertainty. \\
-Target-aware calibration & Matched ROI calibration, weighted calibration if used & Demonstrate that coverage is evaluated under the stated \(q_X\). \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Across all experiments, we report both marginal and conditional diagnostics. Marginal coverage is necessary because it is the formal conformal target. Mean width and Winkler interval score measure efficiency and penalize undercoverage. Bin-wise coverage and worst-bin deviation are diagnostic rather than guaranteed finite-sample quantities; they show whether a method distributes coverage errors evenly across the input domain or hides local failures behind a correct marginal average. For a top-journal version, these diagnostics should be reported with macroreplication uncertainty, such as standard errors or paired confidence intervals for method differences.
+Across all experiments, we report both marginal and conditional diagnostics. Marginal coverage is necessary because it is the formal conformal target. Mean width and Winkler interval score measure efficiency and penalize undercoverage. Bin-wise coverage and worst-bin deviation are diagnostic rather than guaranteed finite-sample quantities; they show whether a method distributes coverage errors evenly across the input domain or hides local failures behind a correct marginal average. Macroreplication summaries are reported with paired comparisons when the same random seeds are used across fixed and adaptive bandwidth arms.
 
 \subsection{Oracle adaptive bandwidth}
 
@@ -664,7 +647,7 @@ The oracle arm sets \(h(x)=c s(x)\), with \(c=1\) unless otherwise stated. The f
 \centering
 \caption{Oracle adaptive bandwidth versus fixed bandwidth. The table is generated from the current adaptive-bandwidth experiment. \(\Delta\) is oracle minus fixed, so negative worst-bin deviation is better.}
 \label{tab:oracle-paired}
-\input{../../exp_adaptive_h/output_exp2/exp2_table.tex}
+\input{../generated/tables/adaptive_h/exp2_oracle_vs_fixed_table.tex}
 \end{table}
 
 \begin{table}[t]
@@ -683,10 +666,10 @@ DGP & \(\Delta\) worst-bin & \(\Delta\) width & \(\Delta\) interval score & Orac
 \end{tabular}
 \end{table}
 
-\IfFileExists{../../exp_adaptive_h/output_exp2/exp2_coverage_curves.png}{
+\IfFileExists{../generated/figures/adaptive_h/exp2_oracle_vs_fixed_coverage.png}{
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.86\linewidth]{../../exp_adaptive_h/output_exp2/exp2_coverage_curves.png}
+\includegraphics[width=0.86\linewidth]{exp2_oracle_vs_fixed_coverage.png}
 \caption{Bin-wise coverage curves for fixed and oracle adaptive smoothing. Oracle adaptive smoothing flattens coverage across input bins while keeping marginal coverage near the conformal target.}
 \label{fig:oracle-curves}
 \end{figure}
@@ -701,103 +684,16 @@ The multiplier \(c\) controls the smoothing scale relative to the local response
 \caption{\(c\)-sweep on \texttt{nongauss\_A1L}. The fixed row is the scalar-bandwidth baseline.}
 \label{tab:c-sweep}
 \resizebox{\linewidth}{!}{%
-\input{../../exp_adaptive_h/output_exp3/exp3_table.tex}
+\input{../generated/tables/adaptive_h/exp3_oracle_c_sweep_table.tex}
 }
 \end{table}
 
-\subsection{Plug-in scale estimation}
-
-The oracle \(s(x)\) is unavailable in practice. We estimate it from Stage-1 replications using \(\mathrm{IQR}/1.349\) at each design site and smooth these sitewise values over \(x\). Table~\ref{tab:plugin-gap} summarizes the plug-in gap at the largest Stage-1 budget \(B=500\). The absolute coverage gap between plug-in and oracle is at the macrorep noise floor, between 0.006 and 0.008 across the four DGPs. The IQR plug-in has a predictable finite-\(r_0\) shrinkage under Gaussian noise and remains stable under Student-\(t_3\) noise.
-
-\begin{table}[t]
-\centering
-\caption{Plug-in versus oracle at Stage-1 budget \(B=500\). Coverage gap is the median absolute difference between plug-in and oracle marginal coverage over macroreplications.}
-\label{tab:plugin-gap}
-\begin{tabular}{lrrrr}
-\toprule
-DGP & Coverage gap & \(q\)-ratio & \(h\)-ratio & Width ratio \\
-\midrule
-\texttt{exp1} & 0.006 & 0.952 & 0.852 & 0.853 \\
-\texttt{gibbs\_s1} & 0.007 & 1.085 & 0.875 & 1.028 \\
-\texttt{nongauss\_A1L} & 0.006 & 0.962 & 0.955 & 0.924 \\
-\texttt{wsc\_gauss} & 0.008 & 1.055 & 0.836 & 0.937 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\IfFileExists{../../exp_adaptive_h/output_exp4_iqr/exp4b_coverage_curves_grid_4dgp.png}{
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.95\linewidth]{../../exp_adaptive_h/output_exp4_iqr/exp4b_coverage_curves_grid_4dgp.png}
-\caption{Coverage curves at \(B=500\) for fixed, oracle, and plug-in bandwidths. Plug-in and oracle adaptive smoothing nearly overlap across the four DGPs.}
-\label{fig:plugin-curves}
-\end{figure}
-}{}
-
-\subsection{Robust scale versus sample standard deviation}
-
-Table~\ref{tab:sd-iqr} compares sample standard deviation and IQR-based plug-in scale estimators at \(B=500\). Both yield similar downstream conformal coverage, because split conformal calibration absorbs moderate multiplicative scale offsets. The difference is theoretical and diagnostic: the sample SD is unstable under Student-\(t_3\) noise, producing a bandwidth ratio of 1.418, whereas IQR remains close to its finite-sample target with ratio 0.955. We therefore use the IQR estimator as the default robust scale estimator.
-
-\begin{table}[t]
-\centering
-\caption{SD versus IQR plug-in scale estimator at \(B=500\).}
-\label{tab:sd-iqr}
-\resizebox{\linewidth}{!}{%
-\input{../../exp_adaptive_h/output_exp4_iqr/exp4_ablation_sd_vs_iqr.tex}
-}
-\end{table}
-
-\subsection{Planned case study: EV fast-charging congestion}
-\label{sec:ev-case}
-
-To connect the method to a realistic stochastic simulation problem, we will add a case study on prediction intervals for waiting time at public EV fast-charging stations under peak corridor-demand scenarios. EV charging infrastructure is a timely application area because public charging demand, station sizing, capacity analysis, and grid impacts are explicitly studied through high-resolution road-trip charging simulation tools such as EVI-RoadTrip \cite{nlrEviRoadTrip}. Public station reliability and availability are also linked to EV adoption concerns \cite{powellJohnson2024}. Recent queueing and planning studies further emphasize congestion, waiting-time service levels, and uncertain demand as central operational issues for EV charging networks \cite{varshney2025,li2025trb}.
-
-\subsubsection{Operational question}
-
-The operational question is not merely whether the expected waiting time is large. A planner needs uncertainty-aware statements such as: under peak travel demand and a specified station configuration, what interval should contain the next customer's waiting time with 90\% target coverage? This question is naturally distributional. Waiting time is often close to zero in low-utilization regimes, but it can become highly variable and right-skewed as utilization approaches one. A mean metamodel can miss this transition, and a fixed-scale conformal correction can hide local instability behind marginal coverage.
-
-This case study therefore matches the paper's two themes. First, the relevant target distribution is not the full design region. It is an operational region of high congestion where reliability matters. Second, the conditional response scale changes sharply across that region, making fixed output-side smoothing a plausible source of DCP score distortion. The case study should demonstrate these two points in a setting that is recognizable to simulation and operations researchers.
-
-The case study is designed to illustrate the target-aware part of the paper without changing the main theorem line. The target input distribution is not the entire design space. Instead, it concentrates on the region of high-utilization operating conditions where planners care most about service reliability:
-\[
-  q_X = p_X\{\,\cdot \mid \rho(X)\in[0.75,0.98]\,\},
-\]
-where \(\rho(X)\) is the implied station utilization under input setting \(X\). Calibration and evaluation inputs will be sampled from this same ROI target distribution \(q_X\), so the empirical coverage claim remains the clean matched target-calibration claim of Proposition~\ref{prop:target-validity}. We do not use this case study to claim validity for arbitrary deployment distributions.
-
-\subsubsection{Discrete-event simulation model}
-
-The simulator will be a discrete-event multi-server charging-station queue, such as an \(M/G/c\) or \(M/G/c/K\) model. Inputs may include an arrival-rate multiplier, number of available DC fast-charging plugs, mean energy demand per vehicle, charging power or mean service rate, plug availability/reliability, and a peak-travel indicator. Public station and port data from the Alternative Fuel Stations API can be used to ground realistic ranges for station size and charger availability \cite{nlrAltFuelApi}. The primary output \(Y\) is customer waiting time before charging. Secondary outputs, if needed, include total time to complete charging or a service-level violation indicator.
-
-One concrete input vector is
-\[
-  X=(\eta,c,\bar e,p_{\mathrm{chg}},a,\tau),
-\]
-where \(\eta\) is an arrival-rate multiplier relative to a baseline corridor demand, \(c\) is the number of DC fast-charging plugs, \(\bar e\) is the mean energy demand per arriving vehicle, \(p_{\mathrm{chg}}\) is the charging power or effective service-rate parameter, \(a\) is the plug availability probability, and \(\tau\) indicates a peak travel period. Given \(X\), arrivals can be generated by a Poisson or nonhomogeneous Poisson process over a finite horizon, energy demands can be sampled from a positive right-skewed distribution, and plug failures can be sampled at the scenario or run level. The implied utilization \(\rho(X)\) is computed from the arrival rate, effective service demand, number of available plugs, and reliability adjustment.
-
-The case study should be implemented as a stochastic simulator rather than as a closed-form queueing formula. This is important because the paper is about simulation output prediction. The simulator can include finite horizon effects, random plug availability, and non-exponential charging times. These features make the conditional waiting-time law non-Gaussian and heteroscedastic, while still being simple enough for controlled macroreplication studies.
-
-\subsubsection{Experimental design}
-
-The training design should cover a broader feasible region than the target ROI so that CKME can learn how the waiting-time distribution changes across utilization levels. The calibration and evaluation designs should be sampled from the ROI target \(q_X\). This creates a clean demonstration of the distinction between training design and target calibration:
-\[
-  p_{\mathrm{tr}}\neq q_X,\qquad p_{\mathrm{cal}}=q_X,\qquad p_{\mathrm{eval}}=q_X.
-\]
-The paper can then state that target validity is claimed for the ROI because calibration and evaluation match under \(q_X\), while the broader training design is used only to improve the conditional CDF estimator.
-
-The design should include utilization bins inside the ROI, for example \([0.75,0.82)\), \([0.82,0.89)\), \([0.89,0.94)\), and \([0.94,0.98]\). These bins are not separate finite-sample coverage guarantees. They are diagnostic groups used to see whether a method has stable behavior across increasingly congested regimes. A useful figure would plot the estimated scale \(\widehat s(x)\) or bandwidth \(h(x)\) against \(\rho(X)\), showing whether the scale estimator increases as the station approaches saturation.
-
-\subsubsection{Methods and metrics}
-
-The main ablation will compare two CKME-DCP variants: fixed bandwidth and plug-in scale-adaptive bandwidth with \(h(x)=c\widehat s(x)\). If implementation time permits, DCP-DR or CQR can be included as external conformal baselines, but they should not distract from the main ablation: whether scale-adaptive CKME-DCP improves interval behavior in a realistic high-congestion ROI. The reported metrics will be target marginal coverage under \(q_X\), utilization-bin coverage, mean interval width, Winkler interval score, and the profile of \(\widehat s(x)\) or \(h(x)\) against utilization.
-
-The results should be reported in three blocks. The first block should show target marginal coverage and interval score, because these are the main conformal and efficiency summaries. The second block should show utilization-bin coverage, because it reveals whether a method is unstable within the ROI. The third block should show mechanism diagnostics: the empirical relationship between utilization, waiting-time spread, \(\widehat s(x)\), and \(h(x)\). The intended story is that scale adaptivity is not just changing one average number; it is aligning the smoothing scale with the congestion-driven output scale.
-
-The expected manuscript role of this case study is diagnostic rather than theorem-extending. It should show that, in a realistic simulation setting where waiting-time variability changes sharply across low- and high-congestion regimes, scale-adaptive CKME-DCP can preserve target coverage while improving bin-wise stability and interval efficiency relative to a fixed-bandwidth CKME-DCP baseline. Numerical tables and figures will be inserted here after the EV charging simulation runs are completed.
+\fi
 
 \section{Positioning Relative to Existing CP Methods}
 \label{sec:positioning}
 
-The proposed method should not be presented as ``CKME makes conformal prediction valid'' or as a method that automatically handles arbitrary target distributions. Conformal validity is already estimator-agnostic, and target validity requires matched calibration or a valid reweighting argument. The correct positioning is narrower and stronger:
+The proposed method does not make conformal validity depend on CKME itself. Split conformal validity is estimator-agnostic once calibration and target samples are exchangeable under the target law. CKME enters through the score-construction layer, where a better conditional CDF estimator and a better smoothing scale can improve interval efficiency and groupwise behavior. The target-aware formulation therefore separates two roles:
 \[
   \begin{aligned}
   &\text{target-aware calibration specifies where validity holds,}\\
@@ -807,18 +703,20 @@ The proposed method should not be presented as ``CKME makes conformal prediction
 
 Conformalized quantile regression adapts interval endpoints through estimated conditional quantiles \cite{romano2019}. Distribution regression versions of DCP estimate the conditional CDF through threshold-indexed regressions \cite{chernozhukov2021}. Localized and weighted conformal methods modify the calibration distribution or score weighting to improve local guarantees \cite{tibshirani2019,hore2025}. CKME-DCP is complementary: it estimates a single conditional distributional object and uses smooth test functions to evaluate CDFs. This representation creates a bandwidth parameter whose local scaling can be matched to the response scale.
 
-This distinction also clarifies the role of adaptive design. Adaptive site selection changes where simulation data are collected. It is a data-acquisition layer and can improve estimator quality in high-uncertainty regions, but it is not the same contribution as scale-adaptive smoothing. A future extension can combine the present target-aware calibration framework with design-aware acquisition rules, but the current paper keeps the main theorem line focused on target validity and scale-adaptive scoring.
+This distinction also clarifies the role of adaptive design. Adaptive site selection changes where simulation data are collected. It is a data-acquisition layer and can improve estimator quality in high-uncertainty regions, but it is not the same contribution as scale-adaptive smoothing. The present paper keeps the theorem line focused on target validity and scale-adaptive scoring.
 
-\section{Discussion and Next Steps}
+\section{Discussion}
 \label{sec:discussion}
 
-The current draft converts the WSC paper into a broader journal story by moving the target distribution and scale bandwidth issues to the front of the paper. The WSC version established the core CKME-DCP pipeline and the basic split-conformal guarantee. The journal version should now emphasize three points.
+This paper separates the validity layer and the score-efficiency layer in CKME-DCP for stochastic simulation outputs. The validity layer is the split-conformal argument under a stated target joint law \(P^q_{XY}=q_XP_{Y\mid X}\). The score-efficiency layer is the CKME conditional CDF estimator and, in particular, the smooth-indicator bandwidth used to evaluate DCP scores.
 
-First, the coverage statement is only meaningful after the target input distribution is specified. Global-domain coverage, region-of-interest coverage, fixed-target-set average coverage, and smoothed fixed-target local coverage are different claims. The target joint law \(P^q_{XY}=q_XP_{Y\mid X}\) should therefore be stated before the algorithm rather than added as a limitation at the end.
+The target formulation makes the coverage statement explicit. Global-domain coverage, region-of-interest coverage, fixed-target-set average coverage, and smoothed fixed-target local coverage are different claims because they integrate over different input laws. The finite-sample split-conformal guarantee applies cleanly in the matched target-calibration setting, while target mismatch requires reweighting or a separate calibration design.
 
-Second, the adaptive bandwidth is not merely an empirical tuning trick. Under heteroscedasticity, fixed smoothing creates the standardized ratio \(h/s(x)\). Setting \(h(x)=c\widehat s(x)\) is a principled way to align CDF resolution across the input space.
+The scale-adaptive bandwidth addresses a different problem. Under heteroscedasticity, fixed smoothing creates the standardized ratio \(h/s(x)\), so the same output-side bandwidth can represent different amounts of smoothing in low- and high-variance regions. Setting \(h(x)=c\widehat s(x)\) aligns the smoothed indicator with local response scale. The oracle analysis shows the mechanism.
 
-Third, future experiments should be organized around calibrated interval performance rather than raw CDF estimation alone. Raw CDF diagnostics can explain mechanism, but the paper's inferential target is coverage, width, interval score, and group-conditional stability after conformal calibration. If \(q_X\) is promoted from a formulation layer to a full contribution layer, the next empirical step should include an ROI or fixed-target experiment in addition to the current scale-adaptive bandwidth experiments.
+\ifincludeexperiments
+The present experiments focus on calibrated interval performance rather than raw CDF estimation alone. Raw CDF diagnostics are useful for mechanism checks, but the inferential targets are coverage, width, interval score, and groupwise stability after conformal calibration. The current numerical evidence supports the scale-adaptive smoothing claim under matched global target distributions. Region-of-interest targets and external conformal or simulation-UQ baselines are natural extensions, but they are not needed for the finite-sample validity statement or for isolating the bandwidth mechanism studied here.
+\fi
 
 \appendix
 
@@ -1072,11 +970,6 @@ A.~N. Angelopoulos and S.~Bates.
 \newblock Conformal prediction: A gentle introduction.
 \newblock \emph{Foundations and Trends in Machine Learning}, 16(4):494--591, 2023.
 
-\bibitem{barber2021}
-R.~F. Barber, E.~J. Candes, A.~Ramdas, and R.~J. Tibshirani.
-\newblock Predictive inference with the jackknife+.
-\newblock \emph{Annals of Statistics}, 49(1):486--507, 2021.
-
 \bibitem{ankenman2010}
 B.~Ankenman, B.~L. Nelson, and J.~Staum.
 \newblock Stochastic kriging for simulation metamodeling.
@@ -1107,21 +1000,6 @@ K.~Muandet, K.~Fukumizu, B.~Sriperumbudur, and B.~Scholkopf.
 \newblock Kernel mean embedding of distributions: A review and beyond.
 \newblock \emph{Foundations and Trends in Machine Learning}, 10(1--2):1--141, 2017.
 
-\bibitem{nlrAltFuelApi}
-National Laboratory of the Rockies.
-\newblock Alternative Fuel Stations API.
-\newblock \url{https://developer.nlr.gov/docs/transportation/alt-fuel-stations-v1/}, accessed 2026.
-
-\bibitem{nlrEviRoadTrip}
-National Laboratory of the Rockies.
-\newblock EVI-RoadTrip: Electric Vehicle Infrastructure for Road Trips Tool.
-\newblock \url{https://www.nlr.gov/transportation/evi-roadtrip}, accessed 2026.
-
-\bibitem{powellJohnson2024}
-B.~Powell and C.~Johnson.
-\newblock Impact of electric vehicle charging station reliability, resilience, and location on electric vehicle adoption.
-\newblock National Renewable Energy Laboratory Technical Report NREL/TP-5R00-89896, 2024.
-
 \bibitem{romano2019}
 Y.~Romano, E.~Patterson, and E.~J. Candes.
 \newblock Conformalized quantile regression.
@@ -1146,16 +1024,6 @@ L.~Song, K.~Fukumizu, and A.~Gretton.
 R.~J. Tibshirani, R.~Foygel Barber, E.~Candes, and A.~Ramdas.
 \newblock Conformal prediction under covariate shift.
 \newblock \emph{Advances in Neural Information Processing Systems}, 2019.
-
-\bibitem{li2025trb}
-Y.~Li, J.~Shu, C.~Wang, T.~Wu, and Y.~Wu.
-\newblock Robust planning for electric vehicle charging stations under congestion.
-\newblock \emph{Transportation Research Part B: Methodological}, 200:103291, 2025.
-
-\bibitem{varshney2025}
-S.~Varshney, K.~P. Panda, M.~Shah, B.~A. Srinivas, A.~Deshmukh, K.~K. Choudhary, M.~Bajaj, L.~Prokop, and O.~Rubanenko.
-\newblock Novel control strategies for electric vehicle charging stations using stochastic modeling and queueing analysis.
-\newblock \emph{Scientific Reports}, 15:21391, 2025.
 
 \bibitem{vovk2005}
 V.~Vovk, A.~Gammerman, and G.~Shafer.
