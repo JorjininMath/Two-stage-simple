@@ -19,7 +19,7 @@ and whether an implementable scale estimator approaches the oracle mechanism.
 - Exp1--Exp3: current manuscript snapshot mechanism evidence, but pre-protocol.
 - Exp4: pre-protocol sample-SD/NW provenance; not final paper evidence.
 - Planned final run: specified but not yet implemented/produced in
-  `planned_final_benchmark_spec.md`.
+  `final_benchmark_spec.md`.
 - Explicit exclusion: the IQR response-scale plug-in is archive-only.
 
 Canonical historical-workflow commands:

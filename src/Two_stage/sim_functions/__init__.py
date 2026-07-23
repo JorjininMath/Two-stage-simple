@@ -1,4 +1,4 @@
-"""Simulators for experiments: exp1, exp2, exp3, exp_test, and non-Gaussian variants."""
+"""Simulator registry for the two-stage experiments."""
 from __future__ import annotations
 import numpy as np
 from .simulator import make_simulator, make_student_t_simulator
@@ -30,6 +30,19 @@ from .sim_exp2_gauss import (
     EXP2_GAUSS_X_BOUNDS,
 )
 from .sim_hd_locscale import make_hd_locscale_simulator, hd_locscale_bounds
+from .sim_mm1_sojourn import (
+    MM1_SOJOURN_X_BOUNDS,
+    mm1_sojourn_mean,
+    mm1_sojourn_scale,
+    mm1_sojourn_simulator,
+)
+from .sim_raised_floor import (
+    RAISED_FLOOR_X_BOUNDS,
+    raised_floor_gauss_simulator,
+    raised_floor_mean,
+    raised_floor_scale,
+    raised_floor_t3_simulator,
+)
 
 exp1_simulator = make_simulator(exp1_true_function, exp1_noise_variance_function)
 exp2_simulator = make_simulator(exp2_true_function, exp2_noise_variance_function)
@@ -111,6 +124,13 @@ _EXPERIMENT_REGISTRY = {
     # nongauss_A1L: Exp 2 (Student-t nu=3) — registered above
     "wsc_gauss": {"simulator": make_exp2_gauss_simulator(sigma_base=0.01, sigma_slope=0.20),
                   "bounds": EXP2_GAUSS_X_BOUNDS, "d": 1},
+    # Final adaptive-h benchmark DGPs.
+    "mm1_sojourn": {"simulator": mm1_sojourn_simulator,
+                    "bounds": MM1_SOJOURN_X_BOUNDS, "d": 1},
+    "raised_floor_gauss": {"simulator": raised_floor_gauss_simulator,
+                           "bounds": RAISED_FLOOR_X_BOUNDS, "d": 1},
+    "raised_floor_t3": {"simulator": raised_floor_t3_simulator,
+                        "bounds": RAISED_FLOOR_X_BOUNDS, "d": 1},
     # High-dimensional location-scale examples with irrelevant covariates.
     "hd_locscale_d2":  {"simulator": make_hd_locscale_simulator(2),  "bounds": hd_locscale_bounds(2),  "d": 2},
     "hd_locscale_d5":  {"simulator": make_hd_locscale_simulator(5),  "bounds": hd_locscale_bounds(5),  "d": 5},

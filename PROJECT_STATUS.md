@@ -140,7 +140,7 @@ marker blocks as JSON when the Career OS importer is ready.
 - Scientific protocol: [`PROTOCOL.md`](PROTOCOL.md)
 - Active experiment boundary: [`EXPERIMENT_INDEX.md`](EXPERIMENT_INDEX.md)
 - Main adaptive-bandwidth specification:
-  [`experiments/adaptive_h/planned_final_benchmark_spec.md`](experiments/adaptive_h/planned_final_benchmark_spec.md)
+  [`experiments/adaptive_h/final_benchmark_spec.md`](experiments/adaptive_h/final_benchmark_spec.md)
 - Current results: [`analysis/CURRENT_RESULTS.md`](analysis/CURRENT_RESULTS.md)
 - Claim-to-evidence map:
   [`analysis/CLAIM_EVIDENCE_MAP.md`](analysis/CLAIM_EVIDENCE_MAP.md)

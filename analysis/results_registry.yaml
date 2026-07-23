@@ -287,7 +287,7 @@ entries:
       - "Estimator is per-site sample SD plus Nadaraya-Watson smoothing; no IQR response-scale arm."
       - "iid target-law calibration with one response per calibration input."
       - "At least 50 macroreplications."
-      - "Final DGPs and budgets match experiments/adaptive_h/planned_final_benchmark_spec.md."
+      - "Final DGPs and budgets match experiments/adaptive_h/final_benchmark_spec.md."
       - "Manifest records seeds, settings, pretrained parameters, selected bw_factor, and source revision."
       - "Per-point data include raw_score, s_oracle, s_hat, h_over_s, and group_bin."
 

@@ -1,16 +1,16 @@
 """
 pretrain_params.py
 
-Run once before Exp1 (fixed-h baseline) to find optimal CKME hyperparameters
-for each of the 4 DGPs via k-fold cross-validation on a pilot dataset.
+Pretrain fixed CKME hyperparameters for the final adaptive-h DGPs.
 
-Best params are saved to experiments/adaptive_h/pretrained_params.json and loaded by
-the run scripts. Per-DGP CV is needed because the 4 DGPs span very different
-x-domains (e.g. exp1 in [0.1, 0.9] vs gibbs_s1 in [-3, 3]).
+Best parameters are selected by site-grouped cross-validation using Stage-1
+data only, then frozen before calibration. By default, results are saved to
+``pretrained_params_final.json``; historical parameter files are not mutated.
 
 Usage (from project root):
     python experiments/adaptive_h/pretrain_params.py
-    python experiments/adaptive_h/pretrain_params.py --n_pilot 200 --r_pilot 10 --cv_folds 5
+    python experiments/adaptive_h/pretrain_params.py \
+        --n_pilot 50 --r_pilot 10 --cv_folds 3 --n_jobs 3
 """
 from __future__ import annotations
 
@@ -29,17 +29,16 @@ from CKME.parameters import ParamGrid
 from Two_stage import run_stage1_train
 
 DEFAULT_SIMULATORS = [
-    "wsc_gauss",      # Gaussian, smooth U
-    "gibbs_s1",       # Gaussian, interior zero (|sin(x)|, x in [-3, 3])
-    "exp1",           # Gaussian, boundary explosion (MG1, x in [0.1, 0.9])
-    "nongauss_A1L",   # Student-t nu=3, smooth U
+    "mm1_sojourn",
+    "raised_floor_gauss",
+    "raised_floor_t3",
 ]
 
 # Search grid covers small (exp1) and large (~6-wide) domains.
 PARAM_GRID = ParamGrid(
     ell_x_list=[0.1, 0.3, 0.5, 1.0, 2.0, 3.0],
     lam_list=[1e-3, 1e-2, 1e-1],
-    h_list=[0.05, 0.1, 0.3, 0.5, 1.0],
+    h_list=[0.05, 0.1, 0.3, 0.5, 1.0, 2.0],
 )
 
 
@@ -66,6 +65,8 @@ def pretrain_one(
     random_state: int,
     param_grid: ParamGrid = PARAM_GRID,
     n_jobs: int = 1,
+    design_method: str = "grid",
+    t_grid_margin: float | None = None,
 ) -> dict:
     result = run_stage1_train(
         n_0=n_pilot,
@@ -75,6 +76,8 @@ def pretrain_one(
         cv_folds=cv_folds,
         n_jobs=n_jobs,
         t_grid_size=t_grid_size,
+        design_method=design_method,
+        t_grid_margin=t_grid_margin,
         random_state=random_state,
     )
     p = result.params
@@ -83,9 +86,9 @@ def pretrain_one(
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--n_pilot", type=int, default=200)
+    ap.add_argument("--n_pilot", type=int, default=50)
     ap.add_argument("--r_pilot", type=int, default=10)
-    ap.add_argument("--cv_folds", type=int, default=5)
+    ap.add_argument("--cv_folds", type=int, default=3)
     ap.add_argument("--n_jobs", type=int, default=1)
     ap.add_argument("--t_grid_size", type=int, default=500)
     ap.add_argument("--seed", type=int, default=20260501)
@@ -98,7 +101,13 @@ def main():
     ap.add_argument(
         "--out",
         type=str,
-        default=str(Path(__file__).parent / "pretrained_params.json"),
+        default=str(Path(__file__).parent / "pretrained_params_final.json"),
+    )
+    ap.add_argument(
+        "--design_method",
+        choices=["grid", "lhs"],
+        default="grid",
+        help="Stage-1 pilot design; the final one-dimensional benchmark uses grid.",
     )
     ap.add_argument(
         "--ell_x_grid",
@@ -127,6 +136,9 @@ def main():
     )
 
     out_path = Path(args.out)
+    if not out_path.is_absolute():
+        out_path = (_root / out_path).resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     out: dict[str, dict] = {}
     if out_path.exists():
         try:
@@ -145,9 +157,27 @@ def main():
             random_state=args.seed,
             param_grid=param_grid,
             n_jobs=args.n_jobs,
+            design_method=args.design_method,
+            t_grid_margin=(
+                3.0 if sim in {"mm1_sojourn", "raised_floor_t3"} else 1.0
+            ),
         )
         print(f"  best: ell_x={best['ell_x']}, lam={best['lam']}, h={best['h']}")
         out[sim] = best
+
+    out["_metadata"] = {
+        "purpose": "final_adaptive_h_pretraining",
+        "simulators": simulators,
+        "n_pilot": args.n_pilot,
+        "r_pilot": args.r_pilot,
+        "cv_folds": args.cv_folds,
+        "t_grid_size": args.t_grid_size,
+        "design_method": args.design_method,
+        "seed": args.seed,
+        "ell_x_grid": param_grid.ell_x_list,
+        "lam_grid": param_grid.lam_list,
+        "h_grid": param_grid.h_list,
+    }
 
     out_path.write_text(json.dumps(out, indent=2, sort_keys=True))
     print(f"\nSaved: {out_path}")

@@ -59,6 +59,32 @@ class TwoStagePipelineSmokeTests(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(upper)))
         self.assertTrue(np.all(lower <= upper))
 
+    def test_calibration_input_and_output_seeds_are_separate(self) -> None:
+        first = run_stage2(
+            stage1_result=self.stage1,
+            X_cand=None,
+            n_1=10,
+            r_1=1,
+            simulator_func="exp1",
+            method="iid",
+            alpha=0.1,
+            random_state=29,
+            sim_random_state=31,
+        )
+        second = run_stage2(
+            stage1_result=self.stage1,
+            X_cand=None,
+            n_1=10,
+            r_1=1,
+            simulator_func="exp1",
+            method="iid",
+            alpha=0.1,
+            random_state=29,
+            sim_random_state=37,
+        )
+        np.testing.assert_array_equal(first.X_stage2, second.X_stage2)
+        self.assertFalse(np.array_equal(first.Y_stage2, second.Y_stage2))
+
 
 if __name__ == "__main__":
     unittest.main()

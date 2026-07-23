@@ -1,0 +1,52 @@
+{
+  "_metadata": {
+    "cv_folds": 3,
+    "design_method": "grid",
+    "ell_x_grid": [
+      0.1,
+      0.3,
+      0.5,
+      1.0,
+      2.0,
+      3.0
+    ],
+    "h_grid": [
+      0.05,
+      0.1,
+      0.3,
+      0.5,
+      1.0,
+      2.0
+    ],
+    "lam_grid": [
+      0.001,
+      0.01,
+      0.1
+    ],
+    "n_pilot": 50,
+    "purpose": "final_adaptive_h_pretraining",
+    "r_pilot": 10,
+    "seed": 20260501,
+    "simulators": [
+      "mm1_sojourn",
+      "raised_floor_gauss",
+      "raised_floor_t3"
+    ],
+    "t_grid_size": 300
+  },
+  "mm1_sojourn": {
+    "ell_x": 0.3,
+    "h": 0.1,
+    "lam": 0.001
+  },
+  "raised_floor_gauss": {
+    "ell_x": 0.5,
+    "h": 0.1,
+    "lam": 0.001
+  },
+  "raised_floor_t3": {
+    "ell_x": 1.0,
+    "h": 0.05,
+    "lam": 0.001
+  }
+}

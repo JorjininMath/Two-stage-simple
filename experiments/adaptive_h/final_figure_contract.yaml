@@ -1,0 +1,31 @@
+schema_version: "1.0"
+experiment: "final_adaptive_h_benchmark"
+data_source: "output_final_adaptive_h"
+primary_coverage_metric: "covered_score"
+reporting_interval: "monotone_projected_cdf_generalized_inverse"
+main_budget: 1000
+target_coverage: 0.90
+figures:
+  scale_functions:
+    question: "How heterogeneous is the oracle response scale in each DGP?"
+    source: "registered DGP definitions"
+    x: "input"
+    y: "conditional standard deviation s(x)"
+  plugin_oracle_budget_gap:
+    question: "Does the implementable plug-in approach the oracle as Stage-1 budget grows?"
+    source: "paired_deltas.csv"
+    x: "Stage-1 budget B"
+    y: "plugin_sd_nw minus oracle"
+    uncertainty: "Monte Carlo SE across paired macroreps"
+  binwise_coverage:
+    question: "How stable is raw-score coverage across equal-count input bins?"
+    source: "per_point files at B=1000"
+    x: "mean input in bin"
+    y: "raw-score coverage"
+    uncertainty: "Monte Carlo SE across macroreps"
+  effective_bandwidth_ratio:
+    question: "Does adaptive h(x) stabilize h(x)/s(x)?"
+    source: "per_point files at B=1000"
+    x: "mean input in bin"
+    y: "h(x)/s(x)"
+    uncertainty: "Monte Carlo SE across macroreps"

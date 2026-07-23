@@ -51,7 +51,7 @@ python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
 
 The final sample-SD/NW paper run is **not yet implemented end-to-end**. Its
 acceptance requirements are in
-`experiments/adaptive_h/planned_final_benchmark_spec.md` and
+`experiments/adaptive_h/final_benchmark_spec.md` and
 `analysis/CLAIM_EVIDENCE_MAP.md`. Do not label the historical Exp4 output as
 that final run.
 

@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "protocol": "PROTOCOL.md",
+  "specification": "experiments/adaptive_h/final_benchmark_spec.md",
+  "simulators": [
+    "mm1_sojourn",
+    "raised_floor_gauss",
+    "raised_floor_t3"
+  ],
+  "budgets": [
+    100,
+    250,
+    500,
+    1000
+  ],
+  "r0": 10,
+  "stage1_design": "grid",
+  "n_cal": 1000,
+  "r_cal": 1,
+  "calibration_method": "iid",
+  "n_test": 1000,
+  "r_test": 1,
+  "test_method": "iid",
+  "target_law": "uniform_over_registered_bounds",
+  "alpha": 0.1,
+  "c_scale": 1.0,
+  "scale_estimator": "sample_sd_nw",
+  "scale_bw_rule": "silverman",
+  "scale_bw_factor": 1.0,
+  "group_bins": 10,
+  "t_grid_size": 1000,
+  "t_grid_margin": {
+    "mm1_sojourn": 3.0,
+    "raised_floor_gauss": 1.0,
+    "raised_floor_t3": 3.0
+  },
+  "n_macro": 50,
+  "base_seed": 2026072351,
+  "pretrained_params_path": "experiments/adaptive_h/pretrained_params_final.json"
+}

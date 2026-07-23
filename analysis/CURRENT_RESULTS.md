@@ -88,7 +88,7 @@ experiments/adaptive_h/output_final_adaptive_h/per_point/...
 
 The run must use iid target-law calibration with one response per calibration
 input, at least 50 macroreplications, the final DGP set and budgets in
-`experiments/adaptive_h/planned_final_benchmark_spec.md`, and the required
+`experiments/adaptive_h/final_benchmark_spec.md`, and the required
 raw-score/scale diagnostics.
 Until those files exist and pass audit, advisor updates should say:
 

@@ -1,10 +1,9 @@
-# Adaptive Bandwidth Experiment Specification
+# Final Adaptive-Bandwidth Benchmark Specification
 
-This document specifies the **planned final** adaptive-bandwidth benchmark.
-The final DGP names, manifest fields, and complete diagnostic schema below are
-not all implemented in the current runners. For runnable historical mechanism
-experiments, start with `README.md`; for the prior working plan, see
-`notes/planning/archived/adaptive-h-exp1-exp4-working-plan.md`.
+This document specifies the **canonical final** adaptive-bandwidth benchmark.
+The implementation entrypoint is `run_final_adaptive_h_benchmark.py`, with
+defaults in `final_benchmark_config.json`. Historical Exp1--Exp4 runners remain
+available only for provenance and mechanism diagnostics.
 
 ## Goal
 
@@ -19,9 +18,10 @@ The experiment targets score construction, interval efficiency, and local/group
 coverage stability. Split conformal calibration remains the source of
 finite-sample marginal coverage.
 
-The experiment intentionally keeps Stage 2 site selection non-adaptive
-(`method="lhs"`) so that the effect of output-side bandwidth adaptation is not
-confounded with adaptive design.
+The experiment does not use the diagnostic score \(S^0\). Stage-1 training uses
+a fixed space-filling grid. Calibration and test inputs are fresh iid draws
+from the same target law \(q_X\), so output-side bandwidth adaptation is not
+confounded with adaptive design and the split-conformal guarantee applies.
 
 ## Main Data-Generating Processes
 
@@ -31,8 +31,8 @@ mean and scale so that the non-Gaussian case isolates tail behavior.
 | Simulator | Domain | Model | Role |
 | --- | --- | --- | --- |
 | `raised_floor_gauss` | `[0, 2*pi]` | `Y = exp(x/10) sin(x) + s(x) epsilon`, `epsilon ~ N(0,1)` | Clean location-scale baseline |
-| `exp1` | `[0.1, 0.9]` | Existing M/G/1 queueing DGP | Boundary high-scale stress |
-| `raised_floor_t3` | `[0, 2*pi]` | `Y = exp(x/10) sin(x) + s(x) epsilon`, `epsilon ~ t_3` | Heavy-tail stress |
+| `mm1_sojourn` | `[0.1, 0.9]` | `Y | rho ~ Exponential(rate=1-rho)` with `mu=1`, `lambda=rho` | Exact stationary M/M/1 sojourn-time benchmark |
+| `raised_floor_t3` | `[0, 2*pi]` | `Y = exp(x/10) sin(x) + s(x) epsilon`, `epsilon ~ t_3 / sqrt(3)` | Heavy-tail stress at the same conditional SD |
 
 For the two raised-floor DGPs,
 
@@ -44,6 +44,17 @@ This replaces the older WSC scale `0.01 + 0.20 * (x - pi)^2` in the final
 adaptive-h figures. The raised floor avoids near-zero scale regions that create
 large plotting artifacts and simplifies the theory assumption
 `0 < s_min <= s(x) <= s_max`.
+
+For `mm1_sojourn`, the stationary M/M/1 sojourn-time distribution is
+
+```text
+Y | rho ~ Exponential(rate = 1 - rho),  rho in [0.1, 0.9],
+s(rho) = SD(Y | rho) = 1 / (1 - rho).
+```
+
+For `raised_floor_t3`, dividing by `sqrt(3)` standardizes a Student-\(t_3\)
+variable to unit variance. Consequently, `s(x)` is the conditional standard
+deviation in both raised-floor DGPs; the two cases differ only in tail shape.
 
 Historical simulators such as `wsc_gauss`, `gibbs_s1`, and `nongauss_A1L`
 should remain registered for backward compatibility, but they are not the
@@ -80,16 +91,10 @@ s_hat_NW(x) =
     sum_i K_b(x, x_i) s_site(x_i) / sum_i K_b(x, x_i).
 ```
 
-The NW bandwidth is a tuning parameter. Use Silverman's rule as the base
-bandwidth and tune a single multiplicative `bw_factor` on pilot runs only.
-Candidate values:
-
-```text
-bw_factor in {0.1, 0.2, 0.3, 0.5, 1.0}
-```
-
-Freeze the selected `bw_factor` before running the main macroreps and record it
-in the run manifest. Do not choose `bw_factor` separately inside each macrorep.
+The final benchmark freezes Silverman's rule with `bw_factor=1.0` before
+calibration. It is recorded in the run manifest and is never chosen with oracle
+scale information or separately inside a macrorep. Any alternative
+`bw_factor` values are sensitivity analyses, not the primary method.
 
 ## Default Settings
 
@@ -100,15 +105,14 @@ Unless a script argument overrides them, use:
 | `alpha` | `0.10` |
 | `c` | `1.0` |
 | `n_macro` | `50` |
-| `n_cand` | `1000` |
 | `t_grid_size` | `1000` |
 | Stage 1 design | equal-spaced grid |
-| Stage 2 method | LHS |
-| Test design | LHS |
-| Stage 2 sites `n_1` | `100` |
-| Stage 2 reps `r_1` | `10` |
-| Test sites `n_test` | `1000` |
-| Test reps `r_test` | `1` |
+| Calibration method | iid from `q_X` |
+| Calibration pairs `n_cal` | `1000` |
+| Calibration reps per input | `1` |
+| Test method | fresh iid from the same `q_X` |
+| Test pairs `n_test` | `1000` |
+| Test reps per input | `1` |
 
 For the Stage 1 budget sweep, fix `r_0 = 10` and use
 
@@ -128,23 +132,25 @@ Run Stage 1 CV before the main experiment:
 
 ```bash
 python experiments/adaptive_h/pretrain_params.py \
-    --simulators raised_floor_gauss,exp1,raised_floor_t3
+    --simulators mm1_sojourn,raised_floor_gauss,raised_floor_t3 \
+    --out experiments/adaptive_h/pretrained_params_final.json
 ```
 
 The CV grid should tune `ell_x`, `lam`, and scalar `h_fixed` using CRPS. Store
-the selected values in `experiments/adaptive_h/pretrained_params.json`. The same
-`ell_x` and `lam` are used for fixed, oracle, and plug-in arms.
+the selected values in
+`experiments/adaptive_h/pretrained_params_final.json`. The same `ell_x` and
+`lam` are used for fixed, oracle, and plug-in arms.
 
 ## Required Outputs
 
-The main runner should write only to ignored output directories, for example:
+The main runner writes only to ignored output directories:
 
 ```text
 experiments/adaptive_h/output_final_adaptive_h/
 ```
 
 Required tracked code should not depend on files inside that output directory.
-Each run should write:
+Each run writes:
 
 | File | Content |
 | --- | --- |
@@ -214,10 +220,10 @@ not replace the three main adaptive-h DGPs.
    - `raised_floor_gauss`
    - `raised_floor_t3`
    - matching oracle scale functions in `adaptive_bandwidth.py`
-2. Update adaptive-h defaults:
+2. Use the final adaptive-h defaults:
    - default simulators are the three main DGPs above
    - default budgets are `{100, 250, 500, 1000}`
-   - default Stage 2 method remains `lhs`
+   - calibration and test inputs are iid from `q_X`, with one output per input
 3. Use sample-SD plus NW smoothing as the only final plug-in estimator.
 4. Save additional diagnostics:
    - `raw_score`
@@ -231,10 +237,10 @@ not replace the three main adaptive-h DGPs.
    - seeds
    - pretrained parameters
    - selected NW `bw_factor`
-6. Separate public entrypoints from historical scripts:
+6. Keep the canonical entrypoint separate from historical scripts:
    - keep old `run_exp1_baseline.py`, `run_exp2_oracle.py`, `run_exp3_csweep.py`,
      and `run_exp4_sample_sd_nw.py` if they are still needed for old outputs
-   - add or promote one canonical final runner for the spec
+   - use `run_final_adaptive_h_benchmark.py` for the final spec
 7. Keep generated artifacts out of Git:
    - output directories, logs, cache files, PNGs, and LaTeX build products should
      remain ignored

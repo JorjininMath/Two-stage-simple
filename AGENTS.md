@@ -90,7 +90,7 @@ python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
 ```
 
 These are runnable historical mechanism scripts; the protocol-aligned final
-run described in `planned_final_benchmark_spec.md` is still pending.
+run described in `final_benchmark_spec.md` is still pending.
 
 ## Tests and Fast Validation
 

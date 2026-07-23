@@ -1,18 +1,14 @@
-"""
-test_data.py
-
-Generate test data with same distribution as Stage 2, excluding X_1 for exchangeability.
-"""
+"""Generate protocol-matched iid test data or legacy design-matched test data."""
 
 from __future__ import annotations
 
-from typing import Literal, Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import numpy as np
 from scipy.spatial.distance import cdist
 
 from .data_collection import collect_stage2_data
-from .design import generate_space_filling_design
+from .design import generate_space_filling_design, sample_iid_qx
 from .s0_score import compute_s0_tail_uncertainty
 from .sim_functions import get_experiment_config
 
@@ -36,18 +32,28 @@ def generate_test_data(
     stage2_result: object,
     n_test: int,
     r_test: int,
-    X_cand: ArrayLike,
+    X_cand: Optional[ArrayLike] = None,
     simulator_func: str = "exp1",
     X_bounds: Optional[Tuple[ArrayLike, ArrayLike]] = None,
     random_state: Optional[int] = None,
     mixed_ratio: float = 0.7,
     tolerance: float = 1e-6,
+    qx_sampler: Optional[
+        Callable[[int, np.random.Generator], ArrayLike]
+    ] = None,
+    sim_random_state: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate test data with same distribution as Stage 2, excluding X_1.
+    Generate test data matched to the Stage-2 calibration protocol.
 
-    Test points are drawn using the same method as stage2.selection_method
-    (lhs, sampling, or mixed). Points overlapping with X_1 are excluded.
+    For ``selection_method="iid"``, draw fresh inputs independently from the
+    same target law q_X used for calibration. The guarantee-bearing protocol
+    requires one fresh output per test input (``r_test=1``). IID test inputs
+    are not filtered against calibration inputs: repeated target locations
+    are valid, especially when q_X is discrete.
+
+    Legacy ``lhs``, ``sampling``, and ``mixed`` modes reproduce the historical
+    design-matched test construction and exclude points overlapping with X_1.
 
     Parameters
     ----------
@@ -56,9 +62,9 @@ def generate_test_data(
     n_test : int
         Number of test design sites.
     r_test : int
-        Replications per test site.
-    X_cand : array-like, shape (n_cand, d)
-        Candidate points. Required for sampling/mixed.
+        Replications per test site. Must be 1 for ``selection_method="iid"``.
+    X_cand : array-like, shape (n_cand, d), optional
+        Candidate points. Required only for legacy sampling/mixed modes.
     simulator_func : str, default="exp1"
     X_bounds : tuple, optional
         (lower, upper). From experiment config if None.
@@ -67,6 +73,13 @@ def generate_test_data(
         For mixed method.
     tolerance : float, default=1e-6
         Min distance to X_1 for exclusion.
+    qx_sampler : callable, optional
+        Custom q_X sampler for ``selection_method="iid"``. Called as
+        ``qx_sampler(n, rng)`` and must return shape ``(n, d)``. The same
+        sampler should be used for calibration and test generation.
+    sim_random_state : int, optional
+        Separate seed for simulator outputs. If omitted, ``random_state`` is
+        reused to preserve historical behavior.
 
     Returns
     -------
@@ -82,15 +95,25 @@ def generate_test_data(
     exp_config = get_experiment_config(simulator_func)
     if X_bounds is None:
         X_bounds = exp_config["bounds"]
-    d = X_1.shape[1]
+    d = int(exp_config["d"])
 
-    if random_state is not None:
-        np.random.seed(random_state)
-
-    if method == "lhs":
+    if method == "iid":
+        if r_test != 1:
+            raise ValueError(
+                f"selection_method='iid' requires r_test=1 (got "
+                f"r_test={r_test}) so each test pair is a fresh iid draw "
+                "from q_X x F(.|x)."
+            )
+        X_test_sites = sample_iid_qx(
+            n=n_test,
+            d=d,
+            bounds=X_bounds,
+            random_state=random_state,
+            qx_sampler=qx_sampler,
+        )
+    elif method == "lhs":
         # Generate LHS, exclude points near X_1
         buffer = 2 * n_test
-        n_gen = 0
         X_test_sites = []
         attempt = 0
         while len(X_test_sites) < n_test and attempt < 10:
@@ -115,8 +138,14 @@ def generate_test_data(
             )
         X_test_sites = np.array(X_test_sites[:n_test])
 
-    else:
+    elif method in {"sampling", "mixed"}:
         # sampling or mixed: use X_cand, exclude X_1
+        if X_cand is None:
+            raise ValueError(
+                f"X_cand is required for legacy method='{method}'"
+            )
+        if random_state is not None:
+            np.random.seed(random_state)
         X_cand = np.atleast_2d(np.asarray(X_cand, dtype=float))
         remain_idx = _exclude_near_x1(X_cand, X_1, tolerance)
         X_remain = X_cand[remain_idx]
@@ -163,11 +192,18 @@ def generate_test_data(
                     selected.extend(rem[idx].tolist())
             selected = np.array(selected[:n_test])
             X_test_sites = X_remain[selected]
+    else:
+        raise ValueError(
+            f"Unknown selection_method={method!r}; expected 'iid', 'lhs', "
+            "'sampling', or 'mixed'."
+        )
 
     X_test_full, Y_test = collect_stage2_data(
         X_1=X_test_sites,
         r_1=r_test,
         simulator_func=simulator_func,
-        random_state=random_state,
+        random_state=(
+            random_state if sim_random_state is None else sim_random_state
+        ),
     )
     return X_test_full, Y_test

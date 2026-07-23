@@ -16,7 +16,7 @@ Three experiments:
   two-stage calibration vs two leakage violations.
 
 General conventions (match
-`experiments/adaptive_h/planned_final_benchmark_spec.md` where applicable):
+`experiments/adaptive_h/final_benchmark_spec.md` where applicable):
 
 - alpha = 0.1 (90% intervals), DCP score `|Fhat(y|x) - 1/2|`.
 - BASE_SEED = 20260714; macrorep k uses seed BASE_SEED + k.

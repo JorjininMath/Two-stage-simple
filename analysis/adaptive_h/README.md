@@ -3,7 +3,7 @@
 This folder indexes adaptive-bandwidth evidence without moving generated
 outputs. The current implementable method is fixed by `PROTOCOL.md` and
 `PROTOCOL.md` and
-`experiments/adaptive_h/planned_final_benchmark_spec.md`: estimate the response
+`experiments/adaptive_h/final_benchmark_spec.md`: estimate the response
 scale by the per-site sample
 standard deviation, smooth the sitewise estimates by Nadaraya-Watson regression,
 and use `h(x) = c * s_hat(x)`.

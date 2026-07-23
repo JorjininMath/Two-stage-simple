@@ -7,7 +7,7 @@ This directory contains two distinct layers:
    Exp4 is a pre-protocol sample-SD/NW result and is provenance, not final
    paper evidence.
 2. **Planned final benchmark**:
-   `planned_final_benchmark_spec.md`. Its final DGP names, budgets, manifest,
+   `final_benchmark_spec.md`. Its final DGP names, budgets, manifest,
    and diagnostic fields are not all implemented yet.
 
 The only active implementable response-scale estimator is

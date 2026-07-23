@@ -108,7 +108,7 @@ python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
 ```
 
 The not-yet-complete final workflow is specified in
-[`experiments/adaptive_h/planned_final_benchmark_spec.md`](experiments/adaptive_h/planned_final_benchmark_spec.md).
+[`experiments/adaptive_h/final_benchmark_spec.md`](experiments/adaptive_h/final_benchmark_spec.md).
 Do not present that specification as already implemented.
 
 Old commands such as `python exp_adaptive_h/run_exp4_plugin.py` are lightweight

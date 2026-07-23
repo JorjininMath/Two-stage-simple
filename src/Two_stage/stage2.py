@@ -91,6 +91,7 @@ def run_stage2(
     verbose: bool = False,
     s0_score_type: str = "tail",
     qx_sampler: Optional[Callable[[int, np.random.Generator], ArrayLike]] = None,
+    sim_random_state: Optional[int] = None,
 ) -> Stage2Result:
     """
     Run Stage 2: build the calibration set, collect D_1, calibrate CP.
@@ -140,6 +141,11 @@ def run_stage2(
     qx_sampler : callable, optional
         Custom q_X sampler for method="iid": qx_sampler(n, rng) -> (n, d).
         Default is uniform over X_bounds.
+    sim_random_state : int, optional
+        Separate simulator-output seed. If omitted, ``random_state`` is reused
+        for backward compatibility. Final experiments should provide both
+        seeds so the calibration-input and calibration-output streams are
+        independently named in the run manifest.
 
     Returns
     -------
@@ -217,7 +223,9 @@ def run_stage2(
         X_1=X_1,
         r_1=r_1,
         simulator_func=simulator_func,
-        random_state=random_state,
+        random_state=(
+            random_state if sim_random_state is None else sim_random_state
+        ),
     )
     if verbose:
         print(f"  Collected D_1: {X_stage2.shape[0]} points ({n_1} × {r_1})")
