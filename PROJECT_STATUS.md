@@ -75,7 +75,7 @@ and specification take precedence.
 | Sample-SD plus NW plug-in under the locked protocol | Complete; mixed performance | Main implementable method |
 | Raw-score homogeneity | Complete | Qualified mechanism evidence |
 | iid target-law calibration check | Complete | Validity audit |
-| Current shareable paper snapshot | Rebuilding from checked assets | Advisor review |
+| Current shareable paper snapshot | Ready: `paper/current/CKME_Adaptive_H.pdf` | Advisor review |
 
 ## Active Tasks
 
@@ -110,6 +110,8 @@ and specification take precedence.
   hash-checked manuscript asset export.~~ (2026-07-23)
 - [x] ~~Updated the journal draft and final experiment report with the
   qualified mixed plug-in result.~~ (2026-07-23)
+- [x] ~~Built and visually verified the unversioned advisor-ready paper
+  snapshot under `paper/current/`.~~ (2026-07-23)
 - [x] ~~Reorganized core code, experiments, notes, results, manuscript assets,
   paper snapshots, and archive into role-based directories with stable paths.~~
   (2026-07-22)
