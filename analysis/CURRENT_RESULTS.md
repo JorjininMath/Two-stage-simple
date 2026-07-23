@@ -1,28 +1,49 @@
 # Current Results Snapshot
 
-Last verified against local result files: **2026-07-22**.
+Last verified against local result files: **2026-07-23**.
 
 ## Bottom Line
 
-The strongest result currently visible in the journal draft is the
-**oracle scale-normalization mechanism**, not the implementable plug-in. In the
-May 1, 2026 Exp2 run (50 paired macroreplications per DGP), oracle adaptive
-bandwidth reduced the median paired worst-bin coverage deviation on all four
-DGPs and improved paired interval score in 98--100% of macroreplications. The
-four median oracle-minus-fixed worst-bin changes were `-0.033`, `-0.016`,
-`-0.061`, and `-0.021`; marginal coverage remained near 0.90.
+The protocol-aligned final adaptive-h benchmark is complete: 50 paired
+macroreplications for three DGPs and four Stage-1 budgets, with 1,000 iid
+target-law calibration pairs and 1,000 fresh iid test pairs per job. All
+raw-score marginal coverages at the main budget `B=1000` are between `0.898`
+and `0.902` (MCSE about `0.002`).
 
-The Exp3 multiplier sweep (50 macroreplications on `nongauss_A1L`) supports
-`c=1` as a practical default, not as a uniquely optimal value. Worst-bin
-deviation was `0.105` at `c=1` and `0.104` at `c=2`; mean interval score was
-`5.276` and `5.251`, respectively.
+The guarantee belongs to raw score-set membership, not automatically to the
+monotone-projected reporting interval. At `B=1000`, M/M/1 fixed has raw
+coverage `0.8987`, projected-interval coverage `0.8546`, and
+score-set/interval disagreement `0.04874`. The other eight combinations have
+projected coverage between `0.8997` and `0.9026` and disagreement between
+`0.0033` and `0.0086`.
 
-These Exp1--Exp3 artifacts predate the locked protocol. They use the older
-paper workflow and therefore support a **mechanism statement only**. They do
-not establish the final finite-sample coverage result or the performance of
-the implementable sample-SD plus Nadaraya--Watson plug-in.
+The strongest mechanism result is qualified. On the raised-floor Gaussian and
+Student-`t3` DGPs, oracle scale normalization reduces the maximum pairwise
+raw-score KS diagnostic from `0.531` to `0.296` and from `0.718` to `0.437`.
+The sample-SD plus Nadaraya--Watson plug-in moves this diagnostic toward oracle
+(`0.468` and `0.539`) and its mean absolute relative scale error falls
+substantially over `B=100` to `B=1000`. On M/M/1, however, fixed and oracle KS
+are similar (`0.224` and `0.231`) and the plug-in value is `0.286`.
 
-## Current Paper Snapshot Evidence
+Practical performance is also mixed. At `B=1000`, the plug-in is narrower than
+fixed bandwidth on all three DGPs, but interval score improves only for the
+Student-`t3` model (`3.486` versus `3.576`). It is slightly worse for Gaussian
+noise (`3.372` versus `3.334`) and substantially worse for M/M/1 (`12.568`
+versus `10.983`). The safe conclusion is therefore that the plug-in
+increasingly, but only partially, tracks the scale pattern and moves the score
+diagnostic toward oracle on the raised-floor DGPs; it does not uniformly
+dominate fixed bandwidth in interval score or groupwise coverage.
+
+## Final Paper Evidence
+
+| Result | Evidence | What is safe to share |
+| --- | --- | --- |
+| Locked final benchmark | `analysis/adaptive_h/final_run_manifest.json`, `final_summary.csv`, `final_paired_deltas.csv` | The iid target-law, one-output-per-input benchmark is complete with 50 macroreplications and nominal raw score-set marginal coverage; projected-interval coverage is a separate reporting metric. |
+| Plug-in scale tracking | `analysis/adaptive_h/final_scale_diagnostics_summary.csv` | Raw oracle-relative scale error decreases with Stage-1 budget for all three DGPs, but includes the untuned global-multiplier difference and is not a uniform-consistency result. |
+| Raw-score mechanism | `analysis/adaptive_h/final_score_homogeneity_summary.csv`, `plot_data/final_raw_score_homogeneity.csv` | Oracle and plug-in reduce the maximum pairwise KS diagnostic on the two raised-floor DGPs; this does not generalize to M/M/1, and the statistic has no null calibration. |
+| Numerical and asset QA | `analysis/adaptive_h/final_qa_report.md`, `manuscript/generated/adaptive_h_assets_manifest.json` | QA passes with one rare small-budget reporting-grid warning; all exported final assets are hash-bound to the QA pass. |
+
+## Historical Mechanism Evidence
 
 | Result | Evidence | What is safe to share |
 | --- | --- | --- |
@@ -73,24 +94,27 @@ the implementable sample-SD plus Nadaraya--Watson plug-in.
 - The M/M/1 input-uncertainty module is KME/CKME feasibility work only; it does
   not provide conformal coverage evidence.
 
-## Critical Missing Refresh
+## Final Refresh Complete
 
-The next claim-closing artifact is a locked-protocol run of the implementable
-`plugin_sd_nw` arm against fixed and oracle arms. It should create:
+The claim-closing run created:
 
 ```text
 experiments/adaptive_h/output_final_adaptive_h/manifest.json
 experiments/adaptive_h/output_final_adaptive_h/per_arm.csv
 experiments/adaptive_h/output_final_adaptive_h/paired_deltas.csv
 experiments/adaptive_h/output_final_adaptive_h/summary.csv
-experiments/adaptive_h/output_final_adaptive_h/per_point/...
+experiments/adaptive_h/output_final_adaptive_h/jobs/.../per_point_*.csv
 ```
 
-The run must use iid target-law calibration with one response per calibration
-input, at least 50 macroreplications, the final DGP set and budgets in
-`experiments/adaptive_h/final_benchmark_spec.md`, and the required
-raw-score/scale diagnostics.
-Until those files exist and pass audit, advisor updates should say:
+It uses iid target-law calibration with one response per input, 50
+macroreplications, the final DGPs and budgets, and complete raw-score/scale
+diagnostics. The full output stays local and ignored; compact checked evidence
+is exported under `analysis/adaptive_h/`.
 
-> The oracle mechanism is supported; the final protocol-aligned sample-SD/NW
-> plug-in comparison is the remaining main empirical gap.
+Advisor updates should say:
+
+> Oracle scale normalization reduces score heterogeneity on the two
+> raised-floor DGPs. The sample-SD/NW plug-in increasingly tracks the scale and
+> moves the score diagnostic toward oracle there, but its interval and
+> groupwise benefits are DGP-dependent. Raw score-set and projected-interval
+> coverage are reported separately.

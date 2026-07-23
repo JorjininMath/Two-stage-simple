@@ -1,31 +1,83 @@
-schema_version: "1.0"
+schema_version: "1.1"
 experiment: "final_adaptive_h_benchmark"
-data_source: "output_final_adaptive_h"
+data_root: "experiments/adaptive_h/output_final_adaptive_h"
 primary_coverage_metric: "covered_score"
 reporting_interval: "monotone_projected_cdf_generalized_inverse"
 main_budget: 1000
 target_coverage: 0.90
+statistical_unit: "macroreplication"
+main_run_macroreplications: 50
+arms: ["fixed", "plugin_sd_nw", "oracle"]
+paired_comparisons:
+  - "plugin_sd_nw_minus_oracle"
+  - "plugin_sd_nw_minus_fixed"
+  - "oracle_minus_fixed"
+output:
+  width_inches: 7.1
+  formats: ["pdf", "svg", "png", "tiff"]
+  latex_primary_format: "pdf"
+  raster_dpi: 400
+  pdf_fonttype: 42
+  svg_text_as_text: true
+  compact_data_directory: "plot_data"
 figures:
   scale_functions:
     question: "How heterogeneous is the oracle response scale in each DGP?"
-    source: "registered DGP definitions"
+    sources:
+      - "src/Two_stage/sim_functions/sim_mm1_sojourn.py"
+      - "src/Two_stage/sim_functions/sim_raised_floor.py"
+      - "experiments/adaptive_h/adaptive_bandwidth.py"
     x: "input"
     y: "conditional standard deviation s(x)"
+    statistic: "deterministic registered oracle scale"
+    compact_data: "plot_data/scale_functions.csv"
+    caption_requirement: "State all three DGPs and identify s(x) as conditional SD."
+    reviewer_risk: "Do not imply that oracle scale is available to the plug-in method."
   plugin_oracle_budget_gap:
     question: "Does the implementable plug-in approach the oracle as Stage-1 budget grows?"
-    source: "paired_deltas.csv"
+    sources:
+      - "paired_deltas.csv"
     x: "Stage-1 budget B"
-    y: "plugin_sd_nw minus oracle"
+    y:
+      - "plugin_sd_nw minus oracle interval score"
+      - "plugin_sd_nw minus oracle worst-group coverage gap"
     uncertainty: "Monte Carlo SE across paired macroreps"
+    statistic: "mean paired difference over 50 macroreplications"
+    compact_data: "plot_data/plugin_oracle_budget_gap.csv"
+    caption_requirement: "Define negative values as favoring the plug-in and identify B=n0*r0."
+    reviewer_risk: "A decreasing scale-estimation error need not imply uniform interval-performance improvement."
   binwise_coverage:
     question: "How stable is raw-score coverage across equal-count input bins?"
-    source: "per_point files at B=1000"
+    sources:
+      - "jobs/*/budget_1000/macrorep_*/per_point_*.csv"
     x: "mean input in bin"
     y: "raw-score coverage"
     uncertainty: "Monte Carlo SE across macroreps"
+    statistic: "mean of macrorep-level equal-count-bin coverage"
+    sample_size: "50 macroreplications; 1000 test pairs per macrorep"
+    compact_data: "plot_data/binwise_coverage.csv"
+    caption_requirement: "State that binwise coverage is diagnostic, not a finite-sample conditional guarantee."
+    reviewer_risk: "Do not substitute reporting-interval coverage for raw-score coverage."
   effective_bandwidth_ratio:
     question: "Does adaptive h(x) stabilize h(x)/s(x)?"
-    source: "per_point files at B=1000"
+    sources:
+      - "jobs/*/budget_1000/macrorep_*/per_point_*.csv"
     x: "mean input in bin"
     y: "h(x)/s(x)"
     uncertainty: "Monte Carlo SE across macroreps"
+    statistic: "mean of macrorep-level bin means"
+    sample_size: "50 macroreplications; 1000 test inputs per macrorep"
+    compact_data: "plot_data/effective_bandwidth_ratio.csv"
+    caption_requirement: "Identify the fixed, sample-SD plus NW, and oracle arms."
+    reviewer_risk: "The fixed-r0 plug-in can differ from the oracle by a global multiplier."
+  raw_score_homogeneity:
+    question: "How similar are raw DCP score distributions across input bins?"
+    sources:
+      - "score_homogeneity_per_arm.csv"
+    x: "Stage-1 budget B"
+    y: "maximum pairwise two-sample KS distance across bins"
+    uncertainty: "Monte Carlo SE across macroreps"
+    statistic: "mean maximum pairwise empirical KS over 50 macroreplications"
+    compact_data: "plot_data/raw_score_homogeneity.csv"
+    caption_requirement: "Define the ten equal-count input bins and label the statistic as descriptive."
+    reviewer_risk: "Score homogeneity is a mechanism diagnostic, not a coverage guarantee."

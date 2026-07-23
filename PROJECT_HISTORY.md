@@ -11,6 +11,20 @@ in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## 2026 Q3
 
+### Final adaptive-h benchmark and paper package
+
+- [x] ~~Implemented the no-\(S^0\), iid target-law final adaptive-h runner,
+  registered M/M/1 and raised-floor Gaussian/Student-\(t_3\) DGPs, and fixed
+  iid test-data generation.~~ (2026-07-23)
+- [x] ~~Completed the 50-macroreplication paired final benchmark over four
+  Stage-1 budgets.~~ (2026-07-23)
+- [x] ~~Added complete raw-score/scale diagnostics, publication-format figures,
+  QA completeness and freshness checks, and QA-bound asset hashes.~~
+  (2026-07-23)
+- [x] ~~Promoted the qualified final evidence into the results registry,
+  claim-evidence map, experiment report, advisor update, and journal draft.~~
+  (2026-07-23)
+
 ### Workspace, provenance, and communication
 
 - [x] ~~Reorganized core code and experiments around `src/` and

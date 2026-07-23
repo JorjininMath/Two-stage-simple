@@ -18,10 +18,16 @@ target input law.
 | How do I prepare an advisor update? | [`research_updates/README.md`](research_updates/README.md) |
 | How do I reproduce or validate code? | [`REPRODUCE.md`](REPRODUCE.md) |
 
-Current evidence supports the **oracle scale-normalization mechanism**. The
-final protocol-aligned comparison of the implementable sample-SD plus
-Nadaraya-Watson estimator is still pending. The former IQR response-scale
-plug-in is retired and exists only in the searchable archive.
+The final 50-macroreplication benchmark is complete. It supports the
+**oracle scale-normalization mechanism** on the raised-floor Gaussian and
+Student-\(t_3\) DGPs and shows that the implementable sample-SD plus
+Nadaraya--Watson estimator increasingly tracks the local scale pattern. Its
+interval-score and groupwise gains are DGP-dependent. In addition, the
+projected M/M/1 fixed interval has 0.855 coverage despite 0.899 raw score-set
+coverage, so projected intervals are audited separately from the
+guarantee-bearing score sets. The current claim is deliberately not one of
+uniform dominance. The former IQR response-scale plug-in is retired and exists
+only in the searchable archive.
 
 ## Locked Method Boundary
 
@@ -33,7 +39,8 @@ plug-in is retired and exists only in the searchable archive.
 - Guarantee-bearing Stage-2 calibration uses iid inputs from the target law and
   exactly one fresh response at each input (`method="iid"`, `r_1=1`).
 - Raw point-evaluated conformity scores define coverage. Monotone-projected CDF
-  intervals define reported width and interval score.
+  intervals define separately audited interval coverage, width, and interval
+  score; they do not inherit the raw score-set guarantee.
 - Design-selected/replicated Stage-2 modes remain available only for older
   experiment reproduction and emit a warning.
 
@@ -95,25 +102,31 @@ now lives under `src/`.
 
 ## Main Adaptive-Bandwidth Workflow
 
-The current runnable Exp4 workflow uses per-site sample SD plus
-Nadaraya-Watson smoothing. Its existing outputs predate the locked protocol and
-are provenance rather than final paper evidence.
+The canonical workflow uses no \(S^0\) score. It trains on a fixed grid and
+uses fresh iid calibration and test inputs from the same target law.
 
 ```bash
-python experiments/adaptive_h/pretrain_params.py
-python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
-python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
-python experiments/adaptive_h/plot_exp4_gaussian_gap.py
-python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
+python experiments/adaptive_h/pretrain_params.py \
+    --simulators mm1_sojourn,raised_floor_gauss,raised_floor_t3 \
+    --out experiments/adaptive_h/pretrained_params_final.json
+python experiments/adaptive_h/run_final_adaptive_h_benchmark.py \
+    --n-workers 4 --executor thread
+python experiments/adaptive_h/summarize_final_adaptive_h_benchmark.py
+python experiments/adaptive_h/analyze_final_adaptive_h_scores.py
+python experiments/adaptive_h/plot_final_adaptive_h_results.py
+python experiments/adaptive_h/qa_final_adaptive_h_benchmark.py --require-final
+python tools/export_manuscript_assets.py
+python tools/export_manuscript_assets.py --check
 ```
 
-The not-yet-complete final workflow is specified in
+The completed workflow is controlled by
 [`experiments/adaptive_h/final_benchmark_spec.md`](experiments/adaptive_h/final_benchmark_spec.md).
-Do not present that specification as already implemented.
+The final local raw output is ignored by Git; compact QA-checked evidence is
+exported under [`analysis/adaptive_h/`](analysis/adaptive_h/) and
+[`manuscript/generated/`](manuscript/generated/).
 
-Old commands such as `python exp_adaptive_h/run_exp4_plugin.py` are lightweight
-compatibility wrappers. New scripts, configs, and outputs belong only under
-`experiments/`.
+Historical Exp1--Exp4 commands and old root wrappers remain provenance-only.
+New scripts, configs, and outputs belong only under `experiments/`.
 
 ## Research-to-Paper Workflow
 
@@ -152,7 +165,7 @@ Two-stage-simple/
 │   ├── Two_stage/                # Stage 1/Stage 2 orchestration
 │   └── project_support/          # stable project-relative path helpers
 ├── experiments/
-│   ├── adaptive_h/               # main paper mechanism and planned final run
+│   ├── adaptive_h/               # main method, final benchmark, and historical diagnostics
 │   ├── coverage_mechanism/       # score/mechanism pilots
 │   ├── framing_validation/       # epistemic/aleatoric diagnostics
 │   ├── design/                   # design and allocation ablations

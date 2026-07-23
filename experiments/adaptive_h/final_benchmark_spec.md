@@ -158,6 +158,8 @@ Each run writes:
 | `per_arm.csv` | one row per `(macrorep, simulator, budget, arm)` |
 | `paired_deltas.csv` | paired plug-in minus oracle and adaptive minus fixed metrics |
 | `summary.csv` | mean, SD, and Monte Carlo SE by `(simulator, budget, arm)` |
+| `scale_diagnostics_summary.csv` | plug-in scale error and `h/s` diagnostics by DGP and budget |
+| `score_homogeneity_*.csv` | complete raw-score KS diagnostics and paired differences |
 | `per_point.csv` files | test-point diagnostics for reproducible plotting |
 
 The per-point files should include:
@@ -199,6 +201,13 @@ Minimum final artifacts:
 3. Budget-sweep plot: plug-in-vs-oracle gap against `B`.
 4. Binwise coverage plot for `fixed`, `plugin_sd_nw`, and `oracle`.
 5. Effective-ratio diagnostic: `h(x) / s(x)` by arm.
+6. Raw-score homogeneity plot: maximum pairwise empirical KS across ten input
+   bins, labeled as a diagnostic rather than a coverage guarantee.
+
+Every figure is saved as PDF, SVG, PNG, and TIFF. The LaTeX workflow uses PDF;
+compact source-data CSVs and a figure QA record are required. Final asset
+export is allowed only when the benchmark QA status is PASS and its recorded
+SHA-256 hashes match the source files.
 
 ## Optional Appendix Experiment
 

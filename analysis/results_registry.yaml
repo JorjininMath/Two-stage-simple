@@ -1,9 +1,10 @@
 schema_version: 1
-updated: "2026-07-22"
+updated: "2026-07-23"
 protocol_path: "PROTOCOL.md"
 registry_scope: "Numerical evidence currently present in the local repository"
 
 classification_definitions:
+  current_final_evidence: "QA-checked evidence produced under the locked protocol and eligible for qualified paper claims."
   current_paper_snapshot: "Referenced by the active draft or paper-facing report; may still require a locked-protocol refresh."
   supporting_or_pilot: "Diagnostic, ablation, benchmark, or feasibility evidence that must retain its run-size and scope qualification."
   legacy_or_provenance: "Retained for history or older reproducibility; not eligible for a current claim."
@@ -272,24 +273,45 @@ entries:
       - "Out of scope for CKME-DCP coverage claims."
 
   - id: "adaptive_h_final_sample_sd_nw"
-    classification: "missing_refresh"
-    evidence_date: null
+    classification: "current_final_evidence"
+    evidence_date: "2026-07-23"
+    date_basis: "final run manifest and QA report"
     paper_role: "critical main-paper implementable-method evidence"
-    protocol_aligned: null
-    final_claim_eligible: false
-    expected_paths:
-      - "experiments/adaptive_h/output_final_adaptive_h/manifest.json"
-      - "experiments/adaptive_h/output_final_adaptive_h/per_arm.csv"
-      - "experiments/adaptive_h/output_final_adaptive_h/paired_deltas.csv"
-      - "experiments/adaptive_h/output_final_adaptive_h/summary.csv"
-      - "experiments/adaptive_h/output_final_adaptive_h/per_point/"
-    acceptance_requirements:
-      - "Estimator is per-site sample SD plus Nadaraya-Watson smoothing; no IQR response-scale arm."
-      - "iid target-law calibration with one response per calibration input."
-      - "At least 50 macroreplications."
-      - "Final DGPs and budgets match experiments/adaptive_h/final_benchmark_spec.md."
-      - "Manifest records seeds, settings, pretrained parameters, selected bw_factor, and source revision."
-      - "Per-point data include raw_score, s_oracle, s_hat, h_over_s, and group_bin."
+    protocol_aligned: true
+    final_claim_eligible: true
+    run_size:
+      paired_macroreplications_per_dgp_budget: 50
+      dgps: ["mm1_sojourn", "raised_floor_gauss", "raised_floor_t3"]
+      stage1_budgets: [100, 250, 500, 1000]
+      calibration_pairs_per_job: 1000
+      test_pairs_per_job: 1000
+      completed_jobs: 600
+      per_point_arm_files: 1800
+    source_paths:
+      - "analysis/adaptive_h/final_run_manifest.json"
+      - "analysis/adaptive_h/final_summary.csv"
+      - "analysis/adaptive_h/final_paired_deltas.csv"
+      - "analysis/adaptive_h/final_scale_diagnostics_summary.csv"
+      - "analysis/adaptive_h/final_score_homogeneity_summary.csv"
+      - "analysis/adaptive_h/final_score_homogeneity_paired_deltas.csv"
+      - "analysis/adaptive_h/final_qa_report.md"
+      - "manuscript/generated/adaptive_h_assets_manifest.json"
+    verified_observations:
+      - "All B=1000 raw-score marginal coverages are between 0.898 and 0.902."
+      - "At B=1000, projected-interval coverage is between 0.900 and 0.903 for eight of nine DGP-arm combinations; fixed-bandwidth M/M/1 is the exception at 0.855, versus raw-score coverage 0.899 and score-set/interval disagreement 0.049."
+      - "Oracle maximum pairwise score KS falls from 0.531 to 0.296 for raised-floor Gaussian and from 0.718 to 0.437 for raised-floor Student-t3."
+      - "At B=1000, plug-in score KS lies between fixed and oracle on both raised-floor DGPs, but not on M/M/1."
+      - "Plug-in mean absolute relative scale error declines over B=100 to B=1000 on all three DGPs, showing increasing but partial scale tracking rather than uniform consistency."
+      - "Plug-in interval score improves over fixed on Student-t3, is slightly worse on Gaussian, and is substantially worse on M/M/1."
+      - "Final QA passes and exported final assets are bound to the QA artifact hashes."
+    limitations:
+      - "The finite-sample guarantee applies to the raw score set; the monotone-projected reporting interval does not automatically inherit it."
+      - "No uniform plug-in dominance in interval score or groupwise coverage."
+      - "The maximum pairwise score KS statistic has no null calibration here and is used only as a relative mechanism diagnostic."
+      - "The oracle-relative scale error includes the untuned fixed-r0 global-multiplier difference and is not the theory's uniform relative-pattern error."
+      - "M/M/1 does not reproduce the raised-floor oracle score-homogeneity improvement."
+      - "Two of 1800 arm files have a reporting-interval grid-boundary rate above 2 percent; both are fixed B=100 runs and no B=1000 arm is affected."
+      - "The final benchmark does not include refreshed external conformal or simulation-UQ baselines."
 
 excluded_current_evidence:
   - pattern: "_archive/01_experiments/diagnostics/adaptive_h_iqr_response_scale/**"

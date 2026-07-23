@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -42,12 +43,56 @@ REQUIRED_POINT_COLUMNS = {
     "U_at_grid_hi",
 }
 ARMS = {"fixed", "plugin_sd_nw", "oracle"}
+SCORE_METRICS = (
+    "max_pairwise_score_ks",
+    "mean_pairwise_score_ks",
+    "bin_mean_score_range",
+)
+SCORE_COMPARISONS = {
+    "plugin_sd_nw_minus_oracle",
+    "plugin_sd_nw_minus_fixed",
+    "oracle_minus_fixed",
+}
+FINAL_FIGURE_STEMS = (
+    "scale_functions",
+    "plugin_oracle_budget_gap",
+    "raw_score_homogeneity",
+    "binwise_coverage",
+    "effective_bandwidth_ratio",
+)
 DEFAULT_OUTPUT = Path(__file__).with_name("output_final_adaptive_h")
 
 
 def _resolve(value: str | Path) -> Path:
     path = Path(value)
     return path.resolve() if path.is_absolute() else (_ROOT / path).resolve()
+
+
+def _display_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(_ROOT).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _key_set(frame: pd.DataFrame, columns: list[str]) -> set[tuple]:
+    normalized = frame[columns].copy()
+    for column in ("macrorep", "budget"):
+        if column in normalized:
+            normalized[column] = normalized[column].astype(int)
+    for column in ("simulator", "arm", "comparison"):
+        if column in normalized:
+            normalized[column] = normalized[column].astype(str)
+    return set(normalized.itertuples(index=False, name=None))
 
 
 def _record(
@@ -76,7 +121,7 @@ def run_qa(
     checks: list[dict[str, Any]] = []
     manifest_path = output_dir / "manifest.json"
     if not manifest_path.exists():
-        _record(checks, "manifest_exists", False, str(manifest_path))
+        _record(checks, "manifest_exists", False, _display_path(manifest_path))
         return {"checks": checks}
     manifest = json.loads(manifest_path.read_text())
     config = manifest.get("resolved_config", {})
@@ -113,7 +158,7 @@ def run_qa(
     )
     per_arm_path = output_dir / "per_arm.csv"
     if not per_arm_path.exists():
-        _record(checks, "per_arm_exists", False, str(per_arm_path))
+        _record(checks, "per_arm_exists", False, _display_path(per_arm_path))
         return {"manifest": manifest, "checks": checks}
     per_arm = pd.read_csv(per_arm_path)
     actual_jobs = per_arm[
@@ -168,6 +213,8 @@ def run_qa(
     missing_columns: dict[str, list[str]] = {}
     nonfinite_files: list[str] = []
     pairing_failures: list[str] = []
+    interval_clip_rates: list[float] = []
+    outside_grid_rates: list[float] = []
     max_clip = 0.0
     max_outside = 0.0
     jobs_root = output_dir / "jobs"
@@ -200,14 +247,15 @@ def run_qa(
             ].to_numpy(dtype=float)
             if not np.isfinite(numeric).all():
                 nonfinite_files.append(str(path.relative_to(output_dir)))
-            max_clip = max(
-                max_clip,
+            file_clip_rate = max(
                 float(frame["L_at_grid_lo"].mean()),
                 float(frame["U_at_grid_hi"].mean()),
             )
-            max_outside = max(
-                max_outside, float(1.0 - frame["y_in_grid"].mean())
-            )
+            file_outside_rate = float(1.0 - frame["y_in_grid"].mean())
+            interval_clip_rates.append(file_clip_rate)
+            outside_grid_rates.append(file_outside_rate)
+            max_clip = max(max_clip, file_clip_rate)
+            max_outside = max(max_outside, file_outside_rate)
         if len(frames) == len(ARMS):
             reference = frames["fixed"][["test_index", "x0", "y"]]
             for arm in ("plugin_sd_nw", "oracle"):
@@ -258,6 +306,11 @@ def run_qa(
         (
             f"max_interval_clip={max_clip:.4f}, "
             f"max_y_outside={max_outside:.4f}, "
+            "arm_files_over_threshold="
+            f"{sum(value > max_grid_clip_rate for value in interval_clip_rates)}"
+            f"/{len(interval_clip_rates)}, "
+            f"mean_interval_clip={np.mean(interval_clip_rates):.6f}, "
+            f"mean_y_outside={np.mean(outside_grid_rates):.6f}, "
             f"threshold={max_grid_clip_rate:.4f}"
         ),
         severity="warning",
@@ -265,8 +318,25 @@ def run_qa(
 
     summary_path = output_dir / "summary.csv"
     paired_path = output_dir / "paired_deltas.csv"
-    _record(checks, "summary_exists", summary_path.exists(), str(summary_path))
-    _record(checks, "paired_deltas_exists", paired_path.exists(), str(paired_path))
+    scale_summary_path = output_dir / "scale_diagnostics_summary.csv"
+    _record(
+        checks,
+        "summary_exists",
+        summary_path.exists(),
+        _display_path(summary_path),
+    )
+    _record(
+        checks,
+        "paired_deltas_exists",
+        paired_path.exists(),
+        _display_path(paired_path),
+    )
+    _record(
+        checks,
+        "scale_diagnostics_summary_exists",
+        scale_summary_path.exists(),
+        _display_path(scale_summary_path),
+    )
     if summary_path.exists():
         summary = pd.read_csv(summary_path)
         target = 1.0 - float(config.get("alpha", 0.1))
@@ -284,7 +354,351 @@ def run_qa(
             f"maximum marginal-coverage deviation={max_z:.2f} MCSE",
             severity="warning",
         )
+    if scale_summary_path.exists():
+        scale_summary = pd.read_csv(scale_summary_path)
+        scale_keys = ["simulator", "budget"]
+        scale_value_columns = [
+            column
+            for column in scale_summary
+            if column.startswith(("mean_", "sd_", "mcse_"))
+        ]
+        expected_scale_rows = (
+            len(config.get("simulators", []))
+            * len(config.get("budgets", []))
+        )
+        scale_complete = (
+            {"simulator", "budget", "n_macroreps"}.issubset(scale_summary)
+            and len(scale_summary) == expected_scale_rows
+            and not scale_summary.duplicated(scale_keys).any()
+            and (
+                scale_summary["n_macroreps"].astype(int)
+                == int(config.get("n_macro", -1))
+            ).all()
+            and bool(scale_value_columns)
+            and np.isfinite(
+                scale_summary[scale_value_columns].to_numpy(dtype=float)
+            ).all()
+        )
+        _record(
+            checks,
+            "scale_diagnostics_summary_complete",
+            scale_complete,
+            (
+                f"rows={len(scale_summary)}, "
+                f"expected_rows={expected_scale_rows}, "
+                f"value_columns={len(scale_value_columns)}"
+            ),
+        )
 
+    score_per_arm_path = output_dir / "score_homogeneity_per_arm.csv"
+    score_summary_path = output_dir / "score_homogeneity_summary.csv"
+    score_paired_path = output_dir / "score_homogeneity_paired_deltas.csv"
+    _record(
+        checks,
+        "score_homogeneity_per_arm_exists",
+        score_per_arm_path.exists(),
+        _display_path(score_per_arm_path),
+    )
+    _record(
+        checks,
+        "score_homogeneity_summary_exists",
+        score_summary_path.exists(),
+        _display_path(score_summary_path),
+    )
+    _record(
+        checks,
+        "score_homogeneity_paired_exists",
+        score_paired_path.exists(),
+        _display_path(score_paired_path),
+    )
+    score_outputs = [
+        score_per_arm_path,
+        score_summary_path,
+        score_paired_path,
+    ]
+    if all(path.exists() for path in score_outputs):
+        score_per_arm = pd.read_csv(score_per_arm_path)
+        score_summary = pd.read_csv(score_summary_path)
+        score_paired = pd.read_csv(score_paired_path)
+        arm_key_columns = ["macrorep", "simulator", "budget", "arm"]
+        expected_arm_keys = _key_set(per_arm, arm_key_columns)
+        required_per_arm_columns = {
+            *arm_key_columns,
+            "n_groups",
+            *SCORE_METRICS,
+        }
+        score_schema_ok = required_per_arm_columns.issubset(score_per_arm)
+        _record(
+            checks,
+            "score_homogeneity_per_arm_schema",
+            score_schema_ok,
+            (
+                "all required columns present"
+                if score_schema_ok
+                else (
+                    "missing="
+                    + str(
+                        sorted(
+                            required_per_arm_columns - set(score_per_arm)
+                        )
+                    )
+                )
+            ),
+        )
+        score_arm_keys = (
+            _key_set(score_per_arm, arm_key_columns)
+            if score_schema_ok
+            else set()
+        )
+        _record(
+            checks,
+            "score_homogeneity_key_match",
+            score_schema_ok
+            and not score_per_arm.duplicated(arm_key_columns).any()
+            and score_arm_keys == expected_arm_keys,
+            (
+                f"actual_unique={len(score_arm_keys)}, "
+                f"expected_unique={len(expected_arm_keys)}"
+            ),
+        )
+        expected_group_count = int(config.get("group_bins", -1))
+        group_counts_ok = (
+            score_schema_ok
+            and len(score_per_arm) == len(expected_arm_keys)
+            and (score_per_arm["n_groups"].astype(int) == expected_group_count).all()
+        )
+        _record(
+            checks,
+            "score_homogeneity_group_count",
+            group_counts_ok,
+            (
+                f"rows={len(score_per_arm)}, "
+                f"expected_rows={len(expected_arm_keys)}, "
+                f"expected_groups={expected_group_count}"
+            ),
+        )
+        score_values = (
+            score_per_arm[list(SCORE_METRICS)].to_numpy(dtype=float)
+            if score_schema_ok
+            else np.empty((0, 0), dtype=float)
+        )
+        _record(
+            checks,
+            "score_homogeneity_per_arm_values",
+            bool(score_values.size) and np.isfinite(score_values).all(),
+            (
+                f"rows={len(score_per_arm)}, "
+                f"metrics={list(SCORE_METRICS)}"
+            ),
+        )
+        ks_values_ok = (
+            bool(score_values.size)
+            and score_per_arm[
+                [
+                    "max_pairwise_score_ks",
+                    "mean_pairwise_score_ks",
+                ]
+            ]
+            .ge(0.0)
+            .all()
+            .all()
+            and score_per_arm[
+                [
+                    "max_pairwise_score_ks",
+                    "mean_pairwise_score_ks",
+                ]
+            ]
+            .le(1.0)
+            .all()
+            .all()
+            and score_per_arm["bin_mean_score_range"].ge(0.0).all()
+        )
+        _record(
+            checks,
+            "score_homogeneity_metric_ranges",
+            ks_values_ok,
+            "KS in [0,1] and bin-mean range nonnegative",
+        )
+
+        summary_key_columns = ["simulator", "budget", "arm"]
+        summary_metric_columns = [
+            f"{prefix}_{metric}"
+            for metric in SCORE_METRICS
+            for prefix in ("mean", "sd", "mcse")
+        ]
+        required_summary_columns = {
+            *summary_key_columns,
+            "n_macroreps",
+            *summary_metric_columns,
+        }
+        summary_schema_ok = required_summary_columns.issubset(score_summary)
+        expected_summary_keys = _key_set(
+            per_arm, summary_key_columns
+        )
+        actual_summary_keys = (
+            _key_set(score_summary, summary_key_columns)
+            if summary_schema_ok
+            else set()
+        )
+        summary_values = (
+            score_summary[summary_metric_columns].to_numpy(dtype=float)
+            if summary_schema_ok
+            else np.empty((0, 0), dtype=float)
+        )
+        summary_complete = (
+            summary_schema_ok
+            and not score_summary.duplicated(summary_key_columns).any()
+            and actual_summary_keys == expected_summary_keys
+            and len(score_summary) == len(expected_summary_keys)
+            and (
+                score_summary["n_macroreps"].astype(int)
+                == int(config.get("n_macro", -1))
+            ).all()
+            and bool(summary_values.size)
+            and np.isfinite(summary_values).all()
+        )
+        _record(
+            checks,
+            "score_homogeneity_summary_complete",
+            summary_complete,
+            (
+                f"rows={len(score_summary)}, "
+                f"expected_rows={len(expected_summary_keys)}, "
+                f"n_macro={config.get('n_macro')}"
+            ),
+        )
+
+        paired_key_columns = [
+            "macrorep",
+            "simulator",
+            "budget",
+            "comparison",
+        ]
+        paired_metric_columns = [
+            f"delta_{metric}" for metric in SCORE_METRICS
+        ]
+        required_paired_columns = {
+            *paired_key_columns,
+            *paired_metric_columns,
+        }
+        paired_schema_ok = required_paired_columns.issubset(score_paired)
+        expected_pair_rows = expected_jobs * len(SCORE_COMPARISONS)
+        comparison_sets = (
+            score_paired.groupby(
+                ["macrorep", "simulator", "budget"]
+            )["comparison"].agg(set)
+            if paired_schema_ok
+            else pd.Series(dtype=object)
+        )
+        paired_values = (
+            score_paired[paired_metric_columns].to_numpy(dtype=float)
+            if paired_schema_ok
+            else np.empty((0, 0), dtype=float)
+        )
+        paired_complete = (
+            paired_schema_ok
+            and not score_paired.duplicated(paired_key_columns).any()
+            and len(score_paired) == expected_pair_rows
+            and len(comparison_sets) == expected_jobs
+            and all(value == SCORE_COMPARISONS for value in comparison_sets)
+            and bool(paired_values.size)
+            and np.isfinite(paired_values).all()
+        )
+        _record(
+            checks,
+            "score_homogeneity_paired_complete",
+            paired_complete,
+            (
+                f"rows={len(score_paired)}, "
+                f"expected_rows={expected_pair_rows}, "
+                f"comparisons={sorted(SCORE_COMPARISONS)}"
+            ),
+        )
+
+        latest_point_mtime = max(
+            (path.stat().st_mtime_ns for path in point_paths),
+            default=0,
+        )
+        score_fresh = all(
+            path.stat().st_mtime_ns >= latest_point_mtime
+            for path in score_outputs
+        )
+        _record(
+            checks,
+            "score_homogeneity_outputs_fresh",
+            score_fresh,
+            "score outputs are no older than the latest per-point file",
+        )
+
+    figure_qa_path = output_dir / "figures" / "figure_qa.json"
+    figure_status = None
+    if figure_qa_path.exists():
+        figure_status = json.loads(figure_qa_path.read_text()).get("status")
+    _record(
+        checks,
+        "figure_qa_passes",
+        figure_status == "pass",
+        f"path={_display_path(figure_qa_path)}, status={figure_status}",
+    )
+    if figure_qa_path.exists() and all(
+        path.exists() for path in score_outputs
+    ):
+        plot_inputs = [
+            summary_path,
+            paired_path,
+            *score_outputs,
+        ]
+        latest_plot_input = max(
+            path.stat().st_mtime_ns
+            for path in plot_inputs
+            if path.exists()
+        )
+        _record(
+            checks,
+            "figure_outputs_fresh",
+            figure_qa_path.stat().st_mtime_ns >= latest_plot_input,
+            "figure QA is no older than all summary and score inputs",
+        )
+
+    main_budget = max(
+        (int(value) for value in config.get("budgets", [])),
+        default=0,
+    )
+    artifact_paths = [
+        manifest_path,
+        summary_path,
+        paired_path,
+        scale_summary_path,
+        output_dir / f"main_table_B{main_budget}.tex",
+        *score_outputs,
+        figure_qa_path,
+        *[
+            output_dir / "figures" / f"{stem}.pdf"
+            for stem in FINAL_FIGURE_STEMS
+        ],
+        *[
+            output_dir / "plot_data" / f"{stem}.csv"
+            for stem in FINAL_FIGURE_STEMS
+        ],
+    ]
+    missing_artifacts = [
+        _display_path(path) for path in artifact_paths if not path.is_file()
+    ]
+    _record(
+        checks,
+        "final_asset_set_complete",
+        not missing_artifacts,
+        (
+            f"verified_artifacts={len(artifact_paths)}"
+            if not missing_artifacts
+            else f"missing={missing_artifacts}"
+        ),
+    )
+    artifact_sha256 = {
+        _display_path(path): _sha256(path)
+        for path in artifact_paths
+        if path.is_file()
+    }
     errors = [
         check
         for check in checks
@@ -297,10 +711,11 @@ def run_qa(
     ]
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "output_dir": str(output_dir),
+        "output_dir": _display_path(output_dir),
         "status": "pass" if not errors else "fail",
         "n_errors": len(errors),
         "n_warnings": len(warnings),
+        "artifact_sha256": artifact_sha256,
         "checks": checks,
     }
 
@@ -337,10 +752,14 @@ def main() -> None:
         require_final=args.require_final,
         max_grid_clip_rate=args.max_grid_clip_rate,
     )
+    markdown_path = output_dir / "qa_report.md"
+    markdown_path.write_text(_markdown(report))
+    report["artifact_sha256"][_display_path(markdown_path)] = _sha256(
+        markdown_path
+    )
     (output_dir / "qa_report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n"
     )
-    (output_dir / "qa_report.md").write_text(_markdown(report))
     print(_markdown(report))
     if report.get("status") != "pass":
         raise SystemExit(1)

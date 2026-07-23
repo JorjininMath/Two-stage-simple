@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-07-22T18:57:53.182687+00:00",
+  "generated_at": "2026-07-23T19:22:52.844808+00:00",
   "generator": "tools/export_manuscript_assets.py",
-  "evidence_scope": "Non-IQR Exp1-Exp3 manuscript snapshot assets",
-  "final_protocol_evidence": false,
+  "evidence_scope": "Non-IQR Exp1-Exp3 mechanism assets and final iid-calibrated sample-SD/NW benchmark evidence",
+  "final_protocol_evidence": true,
   "explicit_exclusions": [
-    "All Exp4 artifacts until the locked-protocol sample-SD/NW run exists",
+    "All pre-protocol Exp4 artifacts",
     "All retired IQR response-scale plug-in artifacts"
   ],
   "assets": [
@@ -67,6 +67,186 @@
       "source_modified_at": "2026-05-01T13:57:01.298974+00:00",
       "size_bytes": 207271,
       "sha256": "c74f78042d575d116aefe4aa0b63e4cea52bcb22ad86f3b5df8188ca56fc7b78",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final B=1000 fixed, sample-SD/NW, and oracle comparison",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/main_table_B1000.tex",
+      "destination": "manuscript/generated/tables/adaptive_h/final_adaptive_h_B1000_table.tex",
+      "source_modified_at": "2026-07-23T19:22:08.898637+00:00",
+      "size_bytes": 2261,
+      "sha256": "9a1ac2f5249ca024def4b34830d42740718ec047d252a501cf2f8ef1a5930212",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final benchmark response-scale functions",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/figures/scale_functions.pdf",
+      "destination": "manuscript/generated/figures/adaptive_h/final_scale_functions.pdf",
+      "source_modified_at": "2026-07-23T19:22:38.059250+00:00",
+      "size_bytes": 22551,
+      "sha256": "4fbbcf07542a42efd47fe3daaa7a73f4157d7b98c66f4220794be533f93b4a73",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Paired plug-in minus oracle budget trends",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/figures/plugin_oracle_budget_gap.pdf",
+      "destination": "manuscript/generated/figures/adaptive_h/final_plugin_oracle_budget_gap.pdf",
+      "source_modified_at": "2026-07-23T19:22:39.041146+00:00",
+      "size_bytes": 25286,
+      "sha256": "5ae290759751737c3df53408293be01c97285a31995fc13a24169634e5d21a3e",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final raw-score binwise coverage",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/figures/binwise_coverage.pdf",
+      "destination": "manuscript/generated/figures/adaptive_h/final_binwise_coverage.pdf",
+      "source_modified_at": "2026-07-23T19:22:43.446493+00:00",
+      "size_bytes": 34631,
+      "sha256": "958093be2e4b983f4258434381543bf8ae2572f9edd93e06ecd8f3046f1c581a",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final effective bandwidth ratio diagnostic",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/figures/effective_bandwidth_ratio.pdf",
+      "destination": "manuscript/generated/figures/adaptive_h/final_effective_bandwidth_ratio.pdf",
+      "source_modified_at": "2026-07-23T19:22:44.449968+00:00",
+      "size_bytes": 34196,
+      "sha256": "58a4301267140eb2f6c39cb8304ee654fd95409591d784f2ee9d9106feeab11c",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final raw-score homogeneity diagnostic",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/figures/raw_score_homogeneity.pdf",
+      "destination": "manuscript/generated/figures/adaptive_h/final_raw_score_homogeneity.pdf",
+      "source_modified_at": "2026-07-23T19:22:40.122913+00:00",
+      "size_bytes": 28360,
+      "sha256": "a24812ba34e8e5ede461b3b000abe336aa460c4174fd12c6f8bd0cef3a762cab",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Compact source data for the final response-scale figure",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/plot_data/scale_functions.csv",
+      "destination": "analysis/adaptive_h/plot_data/final_scale_functions.csv",
+      "source_modified_at": "2026-07-23T19:22:37.647892+00:00",
+      "size_bytes": 63976,
+      "sha256": "084aaa7cdad2f993a3abff0673b87cf3e40c8daff2fa11c4eb70c7b020609e97",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Compact source data for the paired budget-trend figure",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/plot_data/plugin_oracle_budget_gap.csv",
+      "destination": "analysis/adaptive_h/plot_data/final_plugin_oracle_budget_gap.csv",
+      "source_modified_at": "2026-07-23T19:22:38.777859+00:00",
+      "size_bytes": 2725,
+      "sha256": "b5f7037117b4a168bc8d36a85a46cc3b4bf6b4c626277bdf70e60eb9efec2a56",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Compact source data for the final binwise-coverage figure",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/plot_data/binwise_coverage.csv",
+      "destination": "analysis/adaptive_h/plot_data/final_binwise_coverage.csv",
+      "source_modified_at": "2026-07-23T19:22:43.219972+00:00",
+      "size_bytes": 9323,
+      "sha256": "73239f56395b593dfec1fd70227a6156f53bb2c45e35d62ec13a319146df5c92",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Compact source data for the effective-bandwidth-ratio figure",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/plot_data/effective_bandwidth_ratio.csv",
+      "destination": "analysis/adaptive_h/plot_data/final_effective_bandwidth_ratio.csv",
+      "source_modified_at": "2026-07-23T19:22:44.216587+00:00",
+      "size_bytes": 8678,
+      "sha256": "f00d2be74149ea3c4805e6b8685ab350fa794dfe68f9a9233ddb34d8493542d4",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Compact source data for the raw-score-homogeneity figure",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/plot_data/raw_score_homogeneity.csv",
+      "destination": "analysis/adaptive_h/plot_data/final_raw_score_homogeneity.csv",
+      "source_modified_at": "2026-07-23T19:22:39.804393+00:00",
+      "size_bytes": 3138,
+      "sha256": "c5995f1585b3de4c369810569451267bd9f66d9b44a092d35c2456ce0eee0bd1",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final scientific configuration and source provenance",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/manifest.json",
+      "destination": "analysis/adaptive_h/final_run_manifest.json",
+      "source_modified_at": "2026-07-23T18:29:23.058674+00:00",
+      "size_bytes": 3392,
+      "sha256": "3682db74b0df544f1d4e6fcd3f81527863992c68c32f9d82dc5746a60ee867f9",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final arm-level means, standard deviations, and Monte Carlo SEs",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/summary.csv",
+      "destination": "analysis/adaptive_h/final_summary.csv",
+      "source_modified_at": "2026-07-23T19:22:08.445897+00:00",
+      "size_bytes": 16754,
+      "sha256": "8f61531f56f2d94dc62a8125eab657f2f928bea6cb00e27fc3cfd1e0565e33e0",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final macrorep-paired method differences",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/paired_deltas.csv",
+      "destination": "analysis/adaptive_h/final_paired_deltas.csv",
+      "source_modified_at": "2026-07-23T19:22:08.457345+00:00",
+      "size_bytes": 295157,
+      "sha256": "18a872401c7bc26bbf9fcdf1f01e450dfa2544b93672b283f79a70c650ed7f0d",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final sample-SD/NW scale-learning diagnostics by budget",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/scale_diagnostics_summary.csv",
+      "destination": "analysis/adaptive_h/final_scale_diagnostics_summary.csv",
+      "source_modified_at": "2026-07-23T19:22:08.462529+00:00",
+      "size_bytes": 2678,
+      "sha256": "f66abe12fcc4d037b7f54e7123dcf1e4ee05debc7567b9d7f42328e1d12f4fa8",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final raw-score distribution homogeneity summary",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/score_homogeneity_summary.csv",
+      "destination": "analysis/adaptive_h/final_score_homogeneity_summary.csv",
+      "source_modified_at": "2026-07-23T19:22:34.463783+00:00",
+      "size_bytes": 7797,
+      "sha256": "816859ef581b43a1bec29bf7b691b28e14e765506538ee614eef96e34991ef06",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final paired raw-score homogeneity differences",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/score_homogeneity_paired_deltas.csv",
+      "destination": "analysis/adaptive_h/final_score_homogeneity_paired_deltas.csv",
+      "source_modified_at": "2026-07-23T19:22:34.648142+00:00",
+      "size_bytes": 186007,
+      "sha256": "c98d73f11de1e0d59356f7901365a9ccee157d32b7341eed1105942a3e752a70",
+      "destination_exists": true
+    },
+    {
+      "evidence_id": "adaptive_h_final_sample_sd_nw",
+      "role": "Final benchmark QA report",
+      "source": "experiments/adaptive_h/output_final_adaptive_h/qa_report.md",
+      "destination": "analysis/adaptive_h/final_qa_report.md",
+      "source_modified_at": "2026-07-23T19:22:52.665267+00:00",
+      "size_bytes": 3211,
+      "sha256": "d118154fe131be0139b41658426c568c155edc17fab7d49adda5ed4c643d6281",
       "destination_exists": true
     }
   ]

@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 This is the one-page operational update for the CKME two-stage project. It
 records the current scientific boundary, the next actions, and recent completed
@@ -13,22 +13,24 @@ text between each matching `start` and `end` marker.
 ## Quick Update
 
 <!-- career-os:latestResult:start -->
-- **Latest result:** Existing fixed-versus-oracle adaptive-bandwidth evidence is
-  diagnostic only. It qualitatively supports scale normalization, but the
-  protocol-aligned sample-SD plus Nadaraya--Watson plug-in still needs its final
-  run.
+- **Latest result:** The 50-macroreplication final adaptive-h benchmark passed
+  QA. The sample-SD plus Nadaraya--Watson plug-in increasingly tracks the scale
+  and approaches oracle score behavior on the two raised-floor DGPs, but its
+  interval-score and groupwise gains are DGP-dependent. Projected-interval
+  coverage must be reported separately from raw score-set coverage.
 <!-- career-os:latestResult:end -->
 
 <!-- career-os:bottleneck:start -->
-- **Bottleneck:** The current implementable plug-in, raw-score homogeneity, and
-  iid target-law calibration have not yet been verified together in a final
-  paper-scale run.
+- **Bottleneck:** The primary evidence gap is closed. The remaining paper-level
+  choices are global-multiplier/scale-smoother refinement, projection-aware
+  interval construction, a null reference for the KS diagnostic, and the
+  minimal refreshed external baseline set.
 <!-- career-os:bottleneck:end -->
 
 <!-- career-os:nextAction:start -->
-- **Next action:** Run the locked sample-SD plus Nadaraya--Watson workflow with
-  iid target-law calibration, save the required raw scores, and complete its QA
-  before promoting any numerical claim.
+- **Next action:** Review the advisor-ready adaptive-h draft and decide whether
+  to refine the plug-in before adding external baselines, or present the mixed
+  final result as the method's current empirical boundary.
 <!-- career-os:nextAction:end -->
 
 <!-- career-os:advisorAsk:start -->
@@ -45,9 +47,8 @@ text between each matching `start` and `end` marker.
 
 ## Current Milestone
 
-Complete the protocol-aligned adaptive-bandwidth experiment and produce one
-advisor-ready evidence package whose claims, figures, summaries, run settings,
-and source files are traceable.
+Use the completed, traceable adaptive-bandwidth evidence package to settle the
+paper's empirical claim and the smallest next comparison/refinement scope.
 
 ## Locked Scientific Boundary
 
@@ -71,21 +72,23 @@ and specification take precedence.
 | --- | --- | --- |
 | Fixed versus oracle scale normalization | Diagnostic | Mechanism evidence only |
 | Oracle multiplier sensitivity | Diagnostic | Default-value check only |
-| Sample-SD plus NW plug-in under the locked protocol | Pending final run | Intended main implementable method |
-| Raw-score homogeneity | Pending final run | Intended mechanism evidence |
-| iid target-law calibration check | Pending final run | Required validity audit |
-| Current shareable paper snapshot | Not available | Rebuild after method and evidence synchronization |
+| Sample-SD plus NW plug-in under the locked protocol | Complete; mixed performance | Main implementable method |
+| Raw-score homogeneity | Complete | Qualified mechanism evidence |
+| iid target-law calibration check | Complete | Validity audit |
+| Current shareable paper snapshot | Rebuilding from checked assets | Advisor review |
 
 ## Active Tasks
 
-- [ ] **P1:** Run the final sample-SD plus Nadaraya--Watson adaptive-bandwidth
-  experiment under the locked protocol.
-- [ ] **P1:** Save and audit raw conformity scores for the homogeneity analysis.
-- [ ] **P1:** Verify iid target-law calibration with `r_1 = 1` in the final
-  workflow.
-- [ ] **P2:** Create a result manifest linking commands, settings, summaries,
-  tables, figures, and QA.
-- [ ] **P2:** Produce the first dated advisor update from checked evidence.
+- [x] ~~**P1:** Run the final sample-SD plus Nadaraya--Watson
+  adaptive-bandwidth experiment under the locked protocol.~~ (2026-07-23)
+- [x] ~~**P1:** Save and audit raw conformity scores for the homogeneity
+  analysis.~~ (2026-07-23)
+- [x] ~~**P1:** Verify iid target-law calibration with `r_1 = 1` in the final
+  workflow.~~ (2026-07-23)
+- [x] ~~**P2:** Create a result manifest linking commands, settings, summaries,
+  tables, figures, and QA.~~ (2026-07-23)
+- [x] ~~**P2:** Produce the first dated advisor update from checked evidence.~~
+  (2026-07-23)
 - [ ] **P3:** Refresh only the external baselines selected for the paper.
 
 ## Waiting / Blocked
@@ -97,6 +100,16 @@ and specification take precedence.
 
 ## Recently Completed
 
+- [x] ~~Implemented and tested the no-\(S^0\), iid target-law final
+  adaptive-bandwidth workflow, including the iid test-data bug fix and three
+  registered final DGPs.~~ (2026-07-23)
+- [x] ~~Completed 50 paired macroreplications over three DGPs and four budgets,
+  with raw-score, scale, interval, seed, and manifest diagnostics.~~
+  (2026-07-23)
+- [x] ~~Completed score analysis, publication figures, final QA, and
+  hash-checked manuscript asset export.~~ (2026-07-23)
+- [x] ~~Updated the journal draft and final experiment report with the
+  qualified mixed plug-in result.~~ (2026-07-23)
 - [x] ~~Reorganized core code, experiments, notes, results, manuscript assets,
   paper snapshots, and archive into role-based directories with stable paths.~~
   (2026-07-22)

@@ -1,0 +1,144 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+% Paper-facing assets are copied through tools/export_manuscript_assets.py,
+% which records their source paths and hashes.
+\graphicspath{
+  {../generated/figures/adaptive_h/}
+}
+
+\title{Final Scale-Adaptive CKME-DCP Experiment Report}
+\author{}
+\date{July 23, 2026}
+
+\begin{document}
+\maketitle
+
+\paragraph{Status.}
+This report records the completed 50-macroreplication final benchmark. The run
+uses iid target-law calibration with one response per input, excludes the
+diagnostic \(S^0\) score, and compares fixed, oracle, and sample-SD plus
+Nadaraya--Watson bandwidths on paired data. The final QA status is PASS with one
+reporting-layer warning described below.
+
+\section{Research question}
+
+The standard CKME conditional CDF estimator uses a single CV-tuned smooth-indicator
+bandwidth. Under heterogeneous conditional response scales, the effective
+bandwidth is \(h/s(x)\), so a fixed \(h\) can oversmooth low-scale regions and
+undersmooth high-scale regions. We ask two separate questions:
+\begin{enumerate}
+  \item Does replacing the scalar bandwidth with the oracle rule
+\[
+  h(x)=c\,s(x)
+\]
+  reduce raw-score heterogeneity or improve interval performance?
+  \item Does the implementable rule \(h(x)=c\widehat s(x)\), with
+  \(\widehat s\) estimated from replicated Stage-1 data, retain that behavior?
+\end{enumerate}
+
+\section{Locked setup}
+
+The three DGPs are an exact stationary M/M/1 sojourn time,
+\[
+  Y\mid\rho\sim\operatorname{Exponential}(\text{rate}=1-\rho),
+  \qquad \rho\in[0.1,0.9],
+\]
+and two raised-floor location-scale models with mean
+\(e^{x/10}\sin x\), scale \(s(x)=0.10+0.20(x-\pi)^2\), and either Gaussian
+noise or variance-normalized \(t_3/\sqrt{3}\) noise.
+
+Stage~1 uses \(r_0=10\) and
+\(B=n_0r_0\in\{100,250,500,1000\}\). Each macroreplication uses 1,000 iid
+calibration pairs and 1,000 iid test pairs from the same uniform target input
+law, with one response per input. We use 50 macroreplications, \(c=1\), and a
+frozen Silverman factor of one for the Nadaraya--Watson input bandwidth. All
+three arms share Stage-1, calibration, test, and seed streams.
+
+Raw point scores define coverage. A running-max projected CDF and generalized
+inverse define only the reported interval, projected-interval coverage, width,
+and interval score. The fixed scalar bandwidth is selected once on a separate
+site-grouped pretraining sample. The plug-in multiplier and Nadaraya--Watson
+factor are frozen at one rather than comparably tuned, so this is a
+frozen-default mechanism benchmark.
+
+\section{Main results at \texorpdfstring{\(B=1000\)}{B=1000}}
+
+\input{../generated/tables/adaptive_h/final_adaptive_h_B1000_table.tex}
+
+All nine raw-score marginal coverages are between 0.898 and 0.902. The oracle
+mechanism is strong on the two raised-floor DGPs: maximum pairwise score KS
+falls from 0.531 to 0.296 under Gaussian noise and from 0.718 to 0.437 under
+Student-\(t_3\) noise. Their oracle worst-group gaps also fall from 0.112 to
+0.084 and 0.088.
+
+The raw-score guarantee does not automatically transfer to the projected
+interval. For fixed-bandwidth M/M/1, raw coverage is 0.899 but projected
+interval coverage is 0.855, with 0.049 score-set/interval disagreement. The
+other eight \(B=1000\) combinations have projected coverage from 0.900 to
+0.903 and disagreement from 0.003 to 0.009. Width and interval score must
+therefore be interpreted as reporting-layer metrics.
+
+The plug-in result is mixed. It produces narrower intervals than fixed
+bandwidth on all three DGPs, but improves interval score only on
+Student-\(t_3\): 3.486 versus 3.576. Its interval score is 3.372 versus 3.334
+for Gaussian noise and 12.568 versus 10.983 for M/M/1. Its worst-group gaps do
+not uniformly retain the oracle improvement.
+
+\section{Scale and score diagnostics}
+
+The plug-in mean absolute relative scale error decreases from budget 100 to
+1,000: 0.182 to 0.075 for M/M/1, 0.920 to 0.353 for Gaussian noise, and 0.817
+to 0.308 for Student-\(t_3\). Thus the estimator increasingly, but only
+partially, tracks the scale as Stage-1 information grows. This raw error
+includes the fixed-\(r_0\) global-multiplier difference and is not a direct
+test of uniform scale-pattern consistency.
+
+\begin{figure}[ht!]
+\centering
+\includegraphics[width=\linewidth]{final_effective_bandwidth_ratio.pdf}
+\caption{Effective bandwidth ratio at \(B=1000\).}
+\end{figure}
+
+On the two raised-floor models, the plug-in score KS lies between fixed and
+oracle at \(B=1000\): 0.468 for Gaussian noise and 0.539 for
+Student-\(t_3\). M/M/1 is the boundary case: plug-in KS is 0.286, compared
+with 0.224 for fixed and 0.231 for oracle. Because this statistic is the
+maximum of 45 finite-sample pairwise KS distances, it is a relative mechanism
+diagnostic, not a null-calibrated test of exact homogeneity.
+
+\begin{figure}[ht!]
+\centering
+\includegraphics[width=\linewidth]{final_raw_score_homogeneity.pdf}
+\caption{Maximum pairwise raw-score KS distance across ten equal-count input
+bins. Error bars are Monte Carlo standard errors.}
+\end{figure}
+
+\section{QA and safe interpretation}
+
+The audit verifies 600 jobs, 1,800 per-point files, complete paired arms,
+identical test data, finite outputs, complete ten-bin score diagnostics, and
+hash-bound publication assets. The one warning is confined to reporting
+interval inversion: two of 1,800 arm files exceed a 2\% grid-boundary rate,
+both fixed-bandwidth \(B=100\) runs. The mean rate is \(2.14\times10^{-4}\),
+and no \(B=1000\) arm has a boundary hit. Raw-score coverage is unaffected.
+
+The safe conclusion is:
+\begin{quote}
+Oracle scale normalization reduces score heterogeneity in the raised-floor
+Gaussian and heavy-tailed models. The sample-SD plus Nadaraya--Watson plug-in
+increasingly tracks the scale and moves the score diagnostic toward the oracle
+in those models, but its interval-score and groupwise gains are DGP-dependent.
+\end{quote}
+
+The results do not support a claim that the plug-in uniformly dominates fixed
+bandwidth. The main next questions are selection of the global multiplier,
+refinement of the scale smoother, projection-aware interval construction, a
+null reference for the KS diagnostic, and the smallest external baseline set
+needed for a journal comparison.
+
+\end{document}

@@ -3,6 +3,28 @@
 Correctness fixes and protocol changes. Newest first. Each entry states what
 was wrong, why it mattered, and what changed.
 
+## 2026-07-23 — Final iid adaptive-h workflow
+
+- **Wrong:** iid test generation still fell through the legacy
+  candidate/site-selection branch, so a nominal iid final run could use the
+  wrong input law and require `X_cand`.
+- **Fix:** added an explicit iid test-data path that samples directly from
+  `q_X`, uses one output per input, and keeps input/output seed streams
+  separate.
+- Added exact M/M/1 sojourn-time, raised-floor Gaussian, and
+  variance-normalized raised-floor Student-`t3` simulators plus oracle scales.
+- Replaced the historical LHS/replicated final plan with a no-`S^0`, iid
+  target-law runner using `r_cal=r_test=1`, budgets
+  `{100, 250, 500, 1000}`, named paired seeds, checkpoint/resume, and a
+  complete run manifest.
+- Added full raw-score, scale, group-bin, projected-interval, boundary, Monte
+  Carlo SE, score-homogeneity, and compact plot-data outputs.
+- Added completeness/freshness QA, publication-font figure QA, and a hash gate
+  that prevents unverified final assets from entering the manuscript.
+- Completed the independent 50-macroreplication final run. The qualified
+  result supports scale learning and a raised-floor oracle score mechanism,
+  but not uniform plug-in dominance.
+
 ## 2026-07-22 — Research workspace and provenance reorganization
 
 - Moved the public Python packages to `src/{CKME,CP,Two_stage}` while

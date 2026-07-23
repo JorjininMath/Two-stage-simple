@@ -29,7 +29,7 @@ class ProjectStatusExportTests(unittest.TestCase):
 
         self.assertEqual(payload["project_id"], "wk_ckme_ext")
         self.assertEqual(set(payload["fields"]), set(module.FIELD_NAMES))
-        self.assertEqual(payload["last_updated"], "2026-07-22")
+        self.assertEqual(payload["last_updated"], "2026-07-23")
 
     def test_duplicate_or_missing_marker_is_rejected(self) -> None:
         module = load_export_module()

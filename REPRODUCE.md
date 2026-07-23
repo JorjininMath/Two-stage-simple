@@ -49,11 +49,26 @@ python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
 python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
 ```
 
-The final sample-SD/NW paper run is **not yet implemented end-to-end**. Its
-acceptance requirements are in
-`experiments/adaptive_h/final_benchmark_spec.md` and
-`analysis/CLAIM_EVIDENCE_MAP.md`. Do not label the historical Exp4 output as
-that final run.
+The protocol-aligned final sample-SD/NW workflow is:
+
+```bash
+python experiments/adaptive_h/pretrain_params.py \
+    --simulators mm1_sojourn,raised_floor_gauss,raised_floor_t3 \
+    --out experiments/adaptive_h/pretrained_params_final.json
+python experiments/adaptive_h/run_final_adaptive_h_benchmark.py \
+    --n-workers 4 --executor thread
+python experiments/adaptive_h/summarize_final_adaptive_h_benchmark.py
+python experiments/adaptive_h/analyze_final_adaptive_h_scores.py
+MPLCONFIGDIR=/tmp/adaptive_h_mpl \
+    python experiments/adaptive_h/plot_final_adaptive_h_results.py
+python experiments/adaptive_h/qa_final_adaptive_h_benchmark.py --require-final
+python tools/export_manuscript_assets.py
+python tools/export_manuscript_assets.py --check
+```
+
+The runner checkpoints each DGP--budget--macroreplication job and resumes only
+when its scientific configuration hash matches. Historical Exp4 remains
+pre-protocol provenance and must not be labeled as the final run.
 
 ## Supporting Experiments
 
@@ -97,7 +112,7 @@ Then, if a LaTeX installation is available:
 
 ```bash
 cd manuscript/journal_scale_adaptive
-latexmk -pdf target_aware_scale_adaptive_ckme_cp.tex
+latexmk -pdf scale_adaptive_ckme_cp.tex
 ```
 
 The generated manifest records the source, modification time, byte size, and

@@ -2,7 +2,6 @@
 
 This folder indexes adaptive-bandwidth evidence without moving generated
 outputs. The current implementable method is fixed by `PROTOCOL.md` and
-`PROTOCOL.md` and
 `experiments/adaptive_h/final_benchmark_spec.md`: estimate the response
 scale by the per-site sample
 standard deviation, smooth the sitewise estimates by Nadaraya-Watson regression,
@@ -14,9 +13,9 @@ and use `h(x) = c * s_hat(x)`.
 | --- | --- | --- |
 | fixed versus oracle scale normalization | diagnostic | mechanism evidence |
 | oracle multiplier sensitivity | diagnostic | default-value check |
-| sample-SD plus NW plug-in under the locked protocol | pending final run | main implementable method |
-| raw-score homogeneity | pending final run | mechanism evidence |
-| iid target-law calibration check | pending final run | validity audit |
+| sample-SD plus NW plug-in under the locked protocol | complete, mixed performance | main implementable method |
+| raw-score homogeneity | complete | mechanism diagnostic |
+| iid target-law calibration check | complete | validity audit |
 
 Older plug-in output analyses are retained only for local provenance. They are
 not part of the current evidence set and should not be used in the manuscript,
@@ -33,19 +32,24 @@ formal reports, or advisor updates.
 
 ## Current Interpretation
 
-The existing examples support the oracle scale-normalization mechanism
-qualitatively: the adaptive rule flattens `h(x)/s(x)` and improves bin-wise
-stability and interval score relative to fixed bandwidth in the tested settings.
-The implementable sample-SD plus NW method still needs a protocol-aligned final
-run before it can support a paper-facing numerical claim.
+The final 50-macroreplication run supports oracle scale normalization on the
+raised-floor Gaussian and Student-\(t_3\) DGPs. The sample-SD plus NW estimator
+increasingly tracks the scale as budget grows and moves the maximum pairwise
+raw-score KS diagnostic toward the oracle on those two DGPs. Interval score and
+groupwise coverage are mixed, and M/M/1 does not show the same oracle score
+advantage. M/M/1 fixed also has a material raw-score/projected-interval
+coverage discrepancy. Do not claim uniform plug-in dominance, uniform scale
+consistency, or guaranteed coverage for the projected interval.
 
 ## Recommended Next Steps
 
-- Add raw conformity score saving to future adaptive-h runners if score
-  homogeneity becomes a central empirical claim.
-- Run only the sample-SD plus NW plug-in in the final workflow.
-- Keep generated diagnostic CSV/PNG files in
-  `experiments/adaptive_h/output_*` folders.
+- Treat `final_run_manifest.json`, `final_summary.csv`,
+  `final_scale_diagnostics_summary.csv`,
+  `final_score_homogeneity_summary.csv`, and `final_qa_report.md` as the
+  checked compact evidence set.
+- Use `plot_data/` to reconstruct or audit the five exported final figures.
+- Keep full per-point outputs in ignored `experiments/adaptive_h/output_*`
+  folders.
 - Use `experiment_logs/templates/daily_experiment_report.md` for each daily run.
-- Promote only stable, paper-facing conclusions into `manuscript/reports/` or
-  the journal draft.
+- Keep the mixed-outcome limitation in every advisor update and manuscript
+  claim.

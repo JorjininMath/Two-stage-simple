@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Export a small, auditable set of adaptive-h manuscript assets.
+"""Export a small, auditable set of adaptive-h evidence assets.
 
-The allowlist is intentionally explicit. It contains only the non-IQR Exp1--3
-snapshot artifacts used by the paper-facing adaptive-h write-up. Exp4 is not
-included because the final sample-SD/NW run is still pending, and retired IQR
-response-scale artifacts are never eligible for export.
+The allowlist is intentionally explicit. It contains the historical non-IQR
+Exp1--3 mechanism snapshot plus the compact, QA-checked products of the final
+iid-calibrated sample-SD/NW benchmark. Retired IQR response-scale artifacts are
+never eligible for export.
 
 Each copy is hash-checked and recorded in a JSON provenance manifest. Relative
 paths are resolved from the repository root, so the script does not embed a
@@ -25,6 +25,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = REPO_ROOT / "manuscript/generated/adaptive_h_assets_manifest.json"
+FINAL_QA_PATH = (
+    REPO_ROOT
+    / "experiments/adaptive_h/output_final_adaptive_h/qa_report.json"
+)
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,114 @@ ASSETS = (
         evidence_id="adaptive_h_exp3_multiplier_sweep",
         role="Oracle bandwidth-multiplier sensitivity figure",
     ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/main_table_B1000.tex",
+        destination="manuscript/generated/tables/adaptive_h/final_adaptive_h_B1000_table.tex",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final B=1000 fixed, sample-SD/NW, and oracle comparison",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/figures/scale_functions.pdf",
+        destination="manuscript/generated/figures/adaptive_h/final_scale_functions.pdf",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final benchmark response-scale functions",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/figures/plugin_oracle_budget_gap.pdf",
+        destination="manuscript/generated/figures/adaptive_h/final_plugin_oracle_budget_gap.pdf",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Paired plug-in minus oracle budget trends",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/figures/binwise_coverage.pdf",
+        destination="manuscript/generated/figures/adaptive_h/final_binwise_coverage.pdf",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final raw-score binwise coverage",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/figures/effective_bandwidth_ratio.pdf",
+        destination="manuscript/generated/figures/adaptive_h/final_effective_bandwidth_ratio.pdf",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final effective bandwidth ratio diagnostic",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/figures/raw_score_homogeneity.pdf",
+        destination="manuscript/generated/figures/adaptive_h/final_raw_score_homogeneity.pdf",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final raw-score homogeneity diagnostic",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/plot_data/scale_functions.csv",
+        destination="analysis/adaptive_h/plot_data/final_scale_functions.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Compact source data for the final response-scale figure",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/plot_data/plugin_oracle_budget_gap.csv",
+        destination="analysis/adaptive_h/plot_data/final_plugin_oracle_budget_gap.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Compact source data for the paired budget-trend figure",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/plot_data/binwise_coverage.csv",
+        destination="analysis/adaptive_h/plot_data/final_binwise_coverage.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Compact source data for the final binwise-coverage figure",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/plot_data/effective_bandwidth_ratio.csv",
+        destination="analysis/adaptive_h/plot_data/final_effective_bandwidth_ratio.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Compact source data for the effective-bandwidth-ratio figure",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/plot_data/raw_score_homogeneity.csv",
+        destination="analysis/adaptive_h/plot_data/final_raw_score_homogeneity.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Compact source data for the raw-score-homogeneity figure",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/manifest.json",
+        destination="analysis/adaptive_h/final_run_manifest.json",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final scientific configuration and source provenance",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/summary.csv",
+        destination="analysis/adaptive_h/final_summary.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final arm-level means, standard deviations, and Monte Carlo SEs",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/paired_deltas.csv",
+        destination="analysis/adaptive_h/final_paired_deltas.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final macrorep-paired method differences",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/scale_diagnostics_summary.csv",
+        destination="analysis/adaptive_h/final_scale_diagnostics_summary.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final sample-SD/NW scale-learning diagnostics by budget",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/score_homogeneity_summary.csv",
+        destination="analysis/adaptive_h/final_score_homogeneity_summary.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final raw-score distribution homogeneity summary",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/score_homogeneity_paired_deltas.csv",
+        destination="analysis/adaptive_h/final_score_homogeneity_paired_deltas.csv",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final paired raw-score homogeneity differences",
+    ),
+    Asset(
+        source="experiments/adaptive_h/output_final_adaptive_h/qa_report.md",
+        destination="analysis/adaptive_h/final_qa_report.md",
+        evidence_id="adaptive_h_final_sample_sd_nw",
+        role="Final benchmark QA report",
+    ),
 )
 
 
@@ -87,6 +199,41 @@ def sha256(path: Path) -> str:
 
 def relative(path: Path) -> str:
     return path.relative_to(REPO_ROOT).as_posix()
+
+
+def qa_artifact_hashes_match(
+    report: dict[str, object],
+    *,
+    assets: tuple[Asset, ...] = ASSETS,
+    repo_root: Path = REPO_ROOT,
+) -> bool:
+    if report.get("status") != "pass":
+        return False
+    verified_hashes = report.get("artifact_sha256", {})
+    if not isinstance(verified_hashes, dict):
+        return False
+    final_assets = [
+        asset
+        for asset in assets
+        if asset.evidence_id == "adaptive_h_final_sample_sd_nw"
+    ]
+    for asset in final_assets:
+        source = repo_root / asset.source
+        if not source.is_file():
+            return False
+        if verified_hashes.get(asset.source) != sha256(source):
+            return False
+    return True
+
+
+def final_qa_passed() -> bool:
+    if not FINAL_QA_PATH.is_file():
+        return False
+    try:
+        report = json.loads(FINAL_QA_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    return qa_artifact_hashes_match(report)
 
 
 def expected_record(asset: Asset) -> dict[str, object]:
@@ -129,6 +276,13 @@ def export() -> int:
             print(f"MISSING: {path}", file=sys.stderr)
         return 1
 
+    if not final_qa_passed():
+        print(
+            "ERROR: Final adaptive-h QA report is missing or not pass.",
+            file=sys.stderr,
+        )
+        return 1
+
     records = []
     for asset in ASSETS:
         source = REPO_ROOT / asset.source
@@ -147,10 +301,13 @@ def export() -> int:
         "schema_version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "generator": "tools/export_manuscript_assets.py",
-        "evidence_scope": "Non-IQR Exp1-Exp3 manuscript snapshot assets",
-        "final_protocol_evidence": False,
+        "evidence_scope": (
+            "Non-IQR Exp1-Exp3 mechanism assets and final iid-calibrated "
+            "sample-SD/NW benchmark evidence"
+        ),
+        "final_protocol_evidence": True,
         "explicit_exclusions": [
-            "All Exp4 artifacts until the locked-protocol sample-SD/NW run exists",
+            "All pre-protocol Exp4 artifacts",
             "All retired IQR response-scale plug-in artifacts",
         ],
         "assets": records,
@@ -163,6 +320,8 @@ def export() -> int:
 
 def check() -> int:
     errors = []
+    if not final_qa_passed():
+        errors.append("Final adaptive-h QA report is missing or not pass.")
     if not MANIFEST_PATH.is_file():
         errors.append(f"Missing manifest: {relative(MANIFEST_PATH)}")
         manifest = {}

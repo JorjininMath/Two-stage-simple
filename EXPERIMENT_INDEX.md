@@ -1,6 +1,6 @@
 # Experiment Index
 
-Last reviewed: 2026-07-22
+Last reviewed: 2026-07-23
 
 This index defines the experiment boundary for the current CKME-DCP paper. It
 separates runnable code from paper-ready evidence: an experiment may run
@@ -9,26 +9,33 @@ reproduction.
 
 ## Main Paper Line
 
-### `experiments/adaptive_h/` -- active development
+### `experiments/adaptive_h/` -- current main-paper evidence
 
 Purpose: test whether response-scale normalization improves the CKME-DCP score
 and whether an implementable scale estimator approaches the oracle mechanism.
 
 - Active estimator: per-site sample SD plus Nadaraya-Watson smoothing in
   `sample_sd_nw_scale.py`.
-- Exp1--Exp3: current manuscript snapshot mechanism evidence, but pre-protocol.
+- Final benchmark: complete under `final_benchmark_spec.md`, with 50 paired
+  macroreplications, three DGPs, four Stage-1 budgets, iid target-law
+  calibration/test pairs, full raw-score diagnostics, and QA-bound exports.
+- Final interpretation: the plug-in increasingly tracks the scale and
+  approaches the oracle score diagnostic on the two raised-floor DGPs, but
+  interval-score and groupwise gains are DGP-dependent. Projected-interval
+  coverage is audited separately from raw score-set coverage.
+- Exp1--Exp3: pre-protocol mechanism and multiplier evidence only.
 - Exp4: pre-protocol sample-SD/NW provenance; not final paper evidence.
-- Planned final run: specified but not yet implemented/produced in
-  `final_benchmark_spec.md`.
 - Explicit exclusion: the IQR response-scale plug-in is archive-only.
 
-Canonical historical-workflow commands:
+Canonical final-workflow commands:
 
 ```bash
-python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
-python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
-python experiments/adaptive_h/plot_exp4_gaussian_gap.py
-python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
+python experiments/adaptive_h/run_final_adaptive_h_benchmark.py \
+    --n-workers 4 --executor thread
+python experiments/adaptive_h/summarize_final_adaptive_h_benchmark.py
+python experiments/adaptive_h/analyze_final_adaptive_h_scores.py
+python experiments/adaptive_h/plot_final_adaptive_h_results.py
+python experiments/adaptive_h/qa_final_adaptive_h_benchmark.py --require-final
 ```
 
 Before sharing a conclusion, check `analysis/CURRENT_RESULTS.md` and

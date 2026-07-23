@@ -67,7 +67,7 @@ documented project-root commands also work before editable installation.
 
 ## Experiment Layout
 
-- `experiments/adaptive_h/` -- main mechanism line and planned final benchmark.
+- `experiments/adaptive_h/` -- main mechanism line and completed final benchmark.
 - `experiments/coverage_mechanism/` -- score and portability pilots.
 - `experiments/framing_validation/` -- mechanism/epistemic diagnostics.
 - `experiments/design/` -- allocation and saturation ablations.
@@ -83,14 +83,17 @@ Do not write results to old root `exp_*` compatibility directories.
 Current adaptive-h commands:
 
 ```bash
-python experiments/adaptive_h/run_exp4_sample_sd_nw.py --n_macro 50
-python experiments/adaptive_h/summarize_exp4_sample_sd_nw.py
-python experiments/adaptive_h/plot_exp4_gaussian_gap.py
-python experiments/adaptive_h/plot_exp4_score_homogeneity.py --simulator all
+python experiments/adaptive_h/run_final_adaptive_h_benchmark.py \
+    --n-workers 4 --executor thread
+python experiments/adaptive_h/summarize_final_adaptive_h_benchmark.py
+python experiments/adaptive_h/analyze_final_adaptive_h_scores.py
+python experiments/adaptive_h/plot_final_adaptive_h_results.py
+python experiments/adaptive_h/qa_final_adaptive_h_benchmark.py --require-final
 ```
 
-These are runnable historical mechanism scripts; the protocol-aligned final
-run described in `final_benchmark_spec.md` is still pending.
+Historical Exp1--Exp4 scripts remain runnable provenance. The final run
+described in `final_benchmark_spec.md` is complete; its mixed plug-in outcome
+must be reported with the limitations in `analysis/CURRENT_RESULTS.md`.
 
 ## Tests and Fast Validation
 

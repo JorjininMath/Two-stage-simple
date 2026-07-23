@@ -41,6 +41,14 @@ COLORS = {
     "oracle": "#0072B2",
 }
 MARKERS = {"fixed": "o", "plugin_sd_nw": "s", "oracle": "^"}
+FIGURE_STEMS = (
+    "scale_functions",
+    "plugin_oracle_budget_gap",
+    "raw_score_homogeneity",
+    "binwise_coverage",
+    "effective_bandwidth_ratio",
+)
+FIGURE_SUFFIXES = (".pdf", ".svg", ".png", ".tiff")
 
 
 def _resolve(value: str | Path) -> Path:
@@ -64,6 +72,9 @@ def _style() -> None:
             "grid.alpha": 0.22,
             "grid.linewidth": 0.6,
             "lines.linewidth": 1.6,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "svg.fonttype": "none",
         }
     )
 
@@ -71,7 +82,7 @@ def _style() -> None:
 def _save_figure(fig: mpl.figure.Figure, stem: Path) -> list[Path]:
     stem.parent.mkdir(parents=True, exist_ok=True)
     outputs: list[Path] = []
-    for suffix in (".pdf", ".svg", ".png", ".tiff"):
+    for suffix in FIGURE_SUFFIXES:
         path = stem.with_suffix(suffix)
         kwargs = {"bbox_inches": "tight"}
         if suffix in {".png", ".tiff"}:
@@ -160,6 +171,44 @@ def plot_budget_gap(
         data_dir / "plugin_oracle_budget_gap.csv", index=False
     )
     return _save_figure(fig, fig_dir / "plugin_oracle_budget_gap")
+
+
+def plot_score_homogeneity(
+    output_dir: Path, fig_dir: Path, data_dir: Path
+) -> list[Path]:
+    per_arm = pd.read_csv(output_dir / "score_homogeneity_per_arm.csv")
+    summary = _mc_summary(
+        per_arm,
+        ["simulator", "budget", "arm"],
+        "max_pairwise_score_ks",
+    )
+    fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.55), sharey=True)
+    for axis, simulator in zip(axes, SIMULATORS):
+        for arm in ARMS:
+            subset = summary.loc[
+                (summary["simulator"] == simulator)
+                & (summary["arm"] == arm)
+            ]
+            axis.errorbar(
+                subset["budget"],
+                subset["mean"],
+                yerr=subset["mcse"],
+                color=COLORS[arm],
+                marker=MARKERS[arm],
+                markersize=3.5,
+                capsize=2,
+                label=ARM_LABELS[arm],
+            )
+        axis.set_xscale("log")
+        axis.set_xticks(sorted(per_arm["budget"].unique()))
+        axis.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+        axis.set_title(DGP_LABELS[simulator])
+        axis.set_xlabel(r"Stage-1 budget $B=n_0r_0$")
+    axes[0].set_ylabel("Maximum pairwise score KS")
+    axes[0].legend(frameon=False)
+    fig.tight_layout()
+    summary.to_csv(data_dir / "raw_score_homogeneity.csv", index=False)
+    return _save_figure(fig, fig_dir / "raw_score_homogeneity")
 
 
 def _collect_binwise(
@@ -263,6 +312,12 @@ def _hash(path: Path) -> str:
 
 
 def figure_qa(paths: list[Path], fig_dir: Path) -> dict:
+    expected_names = {
+        f"{stem}{suffix}"
+        for stem in FIGURE_STEMS
+        for suffix in FIGURE_SUFFIXES
+    }
+    actual_names = {path.name for path in paths}
     records = []
     for path in paths:
         record = {
@@ -278,11 +333,28 @@ def figure_qa(paths: list[Path], fig_dir: Path) -> dict:
                 record["mode"] = image.mode
                 if min(image.width, image.height) < 800:
                     record["status"] = "fail"
+        elif path.suffix == ".pdf":
+            payload = path.read_bytes()
+            record["type3_font"] = b"/Subtype /Type3" in payload
+            if record["type3_font"]:
+                record["status"] = "fail"
+        elif path.suffix == ".svg":
+            payload = path.read_text(encoding="utf-8")
+            record["text_elements"] = payload.count("<text")
+            if record["text_elements"] == 0:
+                record["status"] = "fail"
         records.append(record)
+    complete_set = actual_names == expected_names
     report = {
         "status": (
-            "pass" if all(row["status"] == "pass" for row in records) else "fail"
+            "pass"
+            if complete_set
+            and all(row["status"] == "pass" for row in records)
+            else "fail"
         ),
+        "expected_files": sorted(expected_names),
+        "missing_files": sorted(expected_names - actual_names),
+        "unexpected_files": sorted(actual_names - expected_names),
         "files": records,
     }
     (fig_dir / "figure_qa.json").write_text(
@@ -306,6 +378,7 @@ def main() -> None:
     paths: list[Path] = []
     paths.extend(plot_scale_functions(fig_dir, data_dir))
     paths.extend(plot_budget_gap(output_dir, fig_dir, data_dir))
+    paths.extend(plot_score_homogeneity(output_dir, fig_dir, data_dir))
     coverage, ratio = _collect_binwise(output_dir, args.main_budget)
     if coverage.empty:
         raise FileNotFoundError(
