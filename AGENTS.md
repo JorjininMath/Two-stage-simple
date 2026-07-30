@@ -1,133 +1,157 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+Guidance for coding and research-assistant work in this repository.
 
-## Language
+## Language and Editing
 
-- **Chinese** for explanations, summaries, and conceptual answers.
-- **English** for all code, comments, docstrings, commit messages, file names, and shell commands.
-- When both are needed: Chinese explanation first, then English code/commands in separate fenced blocks.
+- Use Chinese for explanations and summaries.
+- Use English for code, comments, docstrings, filenames, commands, and commit
+  messages.
+- Prefer small, reviewable diffs and preserve unrelated local changes.
+- Do not delete historical research material. Move it to the indexed archive
+  with an `ARCHIVE.md` record.
+- This repository is public: never add secrets, credentials, private
+  correspondence, or machine-specific absolute paths.
 
-## Workflow
+## Scientific Source of Truth
 
-- Prefer small, reviewable diffs. Do not change unrelated files.
-- Do not delete or rename files unless explicitly requested.
-- This repository is **public**: never introduce secrets, credentials, tokens, or personal paths into tracked files.
+Read these before changing an experiment or manuscript claim:
 
-## Project Overview
+1. `PROJECT_STATUS.md` -- current milestone, bottleneck, and next action.
+2. `PROTOCOL.md` -- locked estimator, calibration, and evaluation rules.
+3. `EXPERIMENT_INDEX.md` -- active/supporting/archive boundary.
+4. `analysis/CURRENT_RESULTS.md` -- checked current interpretation.
+5. `analysis/CLAIM_EVIDENCE_MAP.md` -- claim-level evidence and exclusions.
 
-This is a **two-stage adaptive experimental design framework** for conditional distribution estimation and uncertainty quantification. The core method is CKME (Conditional Kernel Mean Embedding), which estimates conditional CDFs. Prediction intervals are constructed via split conformal prediction (CP) calibrated on adaptively collected Stage 2 data.
+Planning notes never override the protocol or verified analysis.
 
-Benchmarks compare CKME against DCP-DR and hetGP (both implemented in R via `dcp_r.R`).
+## Locked Method Rules
 
-## Running Experiments
+- Active adaptive response scale: per-site sample SD followed by
+  Nadaraya-Watson smoothing (`experiments/adaptive_h/sample_sd_nw_scale.py`).
+- The IQR response-scale plug-in is retired. Its artifacts are archive-only and
+  must not enter active summaries, advisor updates, or manuscript assets.
+- Guarantee-bearing calibration uses `run_stage2(method="iid", r_1=1)`.
+  Design-selected/replicated Stage-2 modes are legacy reproduction modes.
+- Replicated Stage-1 CV must keep all replications of a site in one fold.
+- Raw point scores define coverage; projected CDF intervals define width and
+  interval score.
+- Paper-facing numerical results normally require at least 50 macroreplications
+  and a run manifest.
+
+## Python Layout and API
+
+Core packages use a `src/` layout:
+
+- `src/CKME/` -- CKME conditional CDF model, kernels, indicators, tuning.
+- `src/CP/` -- calibration, scores, projected intervals, evaluation.
+- `src/Two_stage/` -- Stage 1/Stage 2 orchestration and simulators.
+- `src/project_support/` -- project-root and project-relative path helpers.
+
+Public imports remain unchanged:
+
+```python
+from CKME import CKMEModel, Params, ParamGrid
+from CP import CP
+from Two_stage import run_stage1_train, run_stage2
+```
+
+Install with:
 
 ```bash
-# Non-Gaussian noise comparison (Exp 2)
-python exp_nongauss/pretrain_params.py
-python exp_nongauss/run_nongauss_compare.py --n_macro 50 --method lhs
-
-# Conditional coverage consistency (Exp 3)
-python exp_conditional_coverage/run_consistency.py --n_macro 10
-
-# Adaptive bandwidth h(x) — exp4 plug-in vs oracle vs fixed (Exp 6)
-python exp_adaptive_h/run_exp4_plugin.py --n_macro 50
-python exp_adaptive_h/summarize_exp4.py
-python exp_adaptive_h/plot_exp4a.py
-python exp_adaptive_h/plot_exp4b.py --simulator all
-
-# HPC: submit a SLURM array
-sbatch exp_gibbs_compare/run_all_gibbs_arc.sh
+python -m pip install -e ".[experiments]"
 ```
 
-## Using the Two-Stage API
+Direct experiment scripts add the repository root and `src/` to `sys.path` so
+documented project-root commands also work before editable installation.
 
-```python
-# Stage 1: Train CKME model
-from Two_stage import run_stage1_train, run_stage2, save_stage1_train_result, load_stage1_train_result
-from CKME.parameters import Params, ParamGrid
+## Experiment Layout
 
-# Option A: Fixed params (fast)
-params = Params(ell_x=0.5, lam=0.01, h=0.1)
-result = run_stage1_train(n_0=100, r_0=10, simulator_func="exp1", params=params, random_state=42)
+- `experiments/adaptive_h/` -- main mechanism line and completed final benchmark.
+- `experiments/coverage_mechanism/` -- score and portability pilots.
+- `experiments/framing_validation/` -- mechanism/epistemic diagnostics.
+- `experiments/design/` -- allocation and saturation ablations.
+- `experiments/conditional_coverage/` -- consistency diagnostics.
+- `experiments/{nongauss,gibbs_compare,onesided}/` -- supporting comparisons.
+- `experiments/mm1_feasibility/` -- separate non-conformal feasibility module.
+- `experiments/stock/` -- local exploratory extension (ignored).
 
-# Option B: CV hyperparameter tuning
-param_grid = ParamGrid(ell_x_list=[0.5, 1.0], lam_list=[0.01, 0.1], h_list=[0.05, 0.1])
-result = run_stage1_train(n_0=100, r_0=10, simulator_func="exp1", param_grid=param_grid, cv_folds=5)
+Each active experiment owns its config, code, and ignored output directories.
+Use project-relative user paths and file-relative default config/output paths.
+Do not write results to old root `exp_*` compatibility directories.
 
-save_stage1_train_result(result, "output/stage1_model")
-result = load_stage1_train_result("output/stage1_model")
+Current adaptive-h commands:
 
-# Stage 2: Adaptive site selection, data collection, CP calibration
-from Two_stage import run_stage2
-stage2_result = run_stage2(stage1_result=result, n_1=200, r_1=10, method="mixed", alpha=0.1)
+```bash
+python experiments/adaptive_h/run_final_adaptive_h_benchmark.py \
+    --n-workers 4 --executor thread
+python experiments/adaptive_h/summarize_final_adaptive_h_benchmark.py
+python experiments/adaptive_h/analyze_final_adaptive_h_scores.py
+python experiments/adaptive_h/plot_final_adaptive_h_results.py
+python experiments/adaptive_h/qa_final_adaptive_h_benchmark.py --require-final
 ```
 
-## Architecture
+Historical Exp1--Exp4 scripts remain runnable provenance. The final run
+described in `final_benchmark_spec.md` is complete; its mixed plug-in outcome
+must be reported with the limitations in `analysis/CURRENT_RESULTS.md`.
 
-### Module Layout
+## Tests and Fast Validation
 
-- **`CKME/`** — Core model: `ckme.py` (CKMEModel), `parameters.py` (Params/ParamGrid), `kernels.py` (RBF), `indicators.py` (smooth step functions), `coefficients.py` (Cholesky solver), `tuning.py` (k-fold CV with CRPS), `cdf.py`, `loss_functions/{crps,pinball}.py`
-- **`CP/`** — Conformal prediction: `cp.py` (CP class), `calibration.py`, `interval.py`, `scores.py`, `evaluation.py`
-- **`Two_stage/`** — Pipeline orchestration: `stage1_train.py`, `stage2.py`, `s0_score.py`, `site_selection.py`, `data_collection.py`, `design.py`, `io.py`, `evaluation.py`, `sim_functions/`
-- **`exp_*/`** — Active/supporting experiments, each with `config.txt`, `pretrain_params.py`, `run_*.py`, `summarize_*.py`, `plot_*.py`, and `output_*/` (gitignored): `exp_adaptive_h`, `exp_conditional_coverage`, `exp_design`, `exp_gibbs_compare`, `exp_nongauss`, `exp_onesided`
-- **`ckme_dcp_mm1/`** — Feasibility-only KME/CKME M/M/1 input-uncertainty module. It is not a conformal coverage experiment.
-- **`manuscript/`** — Paper-level tex writeup: `manuscript/journal_scale_adaptive/` holds the active journal draft; `manuscript/reports/` holds per-experiment `.tex` reports.
-- **`paper/`** — Dated shareable PDF snapshots, e.g. `CKME_CP_20260616_v0.1.pdf`.
-- **`_archive/`** — Deprecated code and historical entrypoints. Only explicitly promoted public archive entries should be tracked; local history and generated outputs stay ignored.
-- **`notes/`** — Local-only working notes (gitignored): `notes/planning/` (idea drafts), `notes/tex/` (working note drafts), reference MDs at top level
-- **`dissertation_use/`** — Local-only dissertation working folder (gitignored)
-
-### Two-Stage Pipeline Flow
-
-1. **Stage 1** (`run_stage1_train`): Generate `D_0` (n_0 sites × r_0 reps) via simulator → train `CKMEModel` (optionally with CV tuning) → returns `Stage1TrainResult`
-2. **S^0 Score** (`compute_s0`): For candidate sites, compute tail uncertainty = `q_{1-α/2}(x) - q_{α/2}(x)` (quantile interval width from Stage 1 CDF estimate); higher = more informative to sample
-3. **Stage 2** (`run_stage2`): Select n_1 sites from candidates using S^0 scores (method: `lhs`, `sampling`, or `mixed`) → collect `D_1` (n_1 × r_1 reps) → calibrate split-CP on `D_1` → returns `Stage2Result` with calibrated `CP` object
-
-### Key Data Structures
-
-```python
-Stage1TrainResult: model (CKMEModel), t_grid, X_0, X_all, Y_all, params, n_0, r_0, d
-Stage2Result: model, t_grid, X_1, X_stage2, Y_stage2, cp (CP), n_1, r_1, selection_method, alpha
+```bash
+PYTHONPATH=src python -m unittest discover -s tests -v
+python -m pytest experiments/mm1_feasibility/tests -q
+python -m compileall -q src experiments tests tools
+python tools/export_manuscript_assets.py --check
+bash -n hpc/submit_all.sh
 ```
 
-### Site Selection Methods (`Two_stage/site_selection.py`)
+Do not launch a heavy experiment merely to validate a path change. Use imports,
+`--help`, smoke tests, syntax checks, and existing artifacts first.
 
-- `lhs` — Latin Hypercube Sampling (space-filling, ignores S^0)
-- `sampling` — Sample proportional to S^0 scores (adaptive)
-- `mixed` — γ × LHS + (1−γ) × sampling (balances space-filling and adaptive)
+## R and HPC
 
-### Simulators (`Two_stage/sim_functions/`)
+- `benchmarks/dcp/dcp_methods.R` -- DCP helper functions.
+- `benchmarks/dcp/run_one_case.R` -- single exported-case benchmark runner.
+- `experiments/gibbs_compare/` -- experiment-level SLURM/RLCP scripts.
+- `hpc/submit_all.sh` -- root-level SLURM dispatcher.
 
-| Name | Description | Dim | Noise |
-|------|-------------|-----|-------|
-| `exp1` | MG1 queue: ζ(x)=1.5x²/(1−x) | 1D [0.1, 0.9] | Heteroscedastic Gaussian |
-| `exp2` | f(x)=x+sin(πx) | 1D [0, 2π] | Heteroscedastic Gaussian |
-| `wsc_gauss` | f(x)=e^(x/10)sin(x), σ(x)=0.01+0.2(x−π)² | 1D [0, 2π] | Heteroscedastic Gaussian |
-| `nongauss_A1S/L` | Same mean/scale as `wsc_gauss`, Student-t (ν=10 or 3) | 1D [0, 2π] | Student-t |
-| `gibbs_s1` | Y=0.5x+σ(x)ε, σ(x)=\|sin(x)\| | 1D | Heteroscedastic Gaussian |
-| `gibbs_s2` | Same form, σ(x)=2φ(x/1.5) | 1D | Heteroscedastic Gaussian |
+Run SLURM commands from the repository root and review cluster-specific
+account/partition/email settings before submission.
 
-To add a new simulator, create a file in `Two_stage/sim_functions/` and register it in `__init__.py`.
+## Results, Manuscript, and Sharing
 
-### Hyperparameters (set in `config.txt` or via `Params`)
+- Run facts: `experiment_logs/`.
+- Checked interpretation and evidence registry: `analysis/`.
+- Stable paper assets: `manuscript/generated/`.
+- Active paper: `manuscript/journal_scale_adaptive/`.
+- Advisor/coauthor packages: `research_updates/`.
+- Shareable PDF: `paper/current/`; superseded snapshots: `paper/archive/`.
 
-- `ell_x` — RBF kernel length scale for X
-- `lam` — Tikhonov regularization in Cholesky solver
-- `h` — Bandwidth of smooth indicator functions (logistic/gaussian_cdf)
-- `alpha` — CP significance level (e.g., 0.1 → 90% coverage target)
-- `t_grid_size` — Number of threshold points for CDF evaluation
+The manuscript must read exported assets rather than temporary experiment
+output paths. Refresh/check the explicit allowlist with:
 
-### Evaluation Metrics (`Two_stage/evaluation.py`)
+```bash
+python tools/export_manuscript_assets.py
+python tools/export_manuscript_assets.py --check
+```
 
-- **Coverage**: P(L ≤ Y ≤ U), target = 1 − α
-- **Width**: E[U − L]
-- **Interval Score**: (U − L) + (2/α)(L − Y)₊ + (2/α)(Y − U)₊
+Advisor-returned files belong in a private dated round under
+`manuscript/advisor_feedback/rounds/`. Never edit the received file in place;
+record its checksum and integrate changes into the active manuscript.
 
-### R Integration
+## Notes and Archive
 
-`dcp_r.R` implements DCP-DR (distributional conformal prediction with quantile regression) and hetGP benchmarks. Experiment scripts call it via subprocess. Requires R with `dcp`, `hetGP`, and `quantreg` packages installed.
+`notes/` is local working memory organized into ideas, current/archived plans,
+theory, decisions, meetings, literature, and legacy drafts. Use descriptive
+filenames and date decisions/meeting notes.
 
-### HPC (ARC/SLURM)
+`_archive/` is reference-only. Start with `_archive/INDEX.md` or
+`_archive/CATALOG.tsv`; every item has reopening instructions in `ARCHIVE.md`.
+Large local payloads are inventoried in `_archive/manifests/FILES.tsv`.
 
-Per-experiment SLURM scripts (e.g. `exp_gibbs_compare/run_all_gibbs_arc.sh`) submit a 50-macrorep array; each macrorep runs the experiment with a unique seed. Per-macrorep outputs land in `output_*/macrorep_<k>/`. The top-level `submit_all.sh` batches multiple experiments.
+## Career OS Boundary
+
+`PROJECT_STATUS.md` is authoritative. Preserve its `career-os:*` marker pairs
+for a future one-way importer. Career OS may display the operational summary,
+but it must not become the source of scientific claims or write them back into
+this repository.

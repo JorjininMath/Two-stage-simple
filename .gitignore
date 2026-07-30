@@ -10,9 +10,16 @@ Journal_Ideas_*.md
 
 # Personal research notes and dissertation materials (local only)
 notes/
-dissertation_use/
-exp_stock/
+experiments/stock/
 experiment_logs/
+
+# Private communication workspaces; keep instructions/templates public.
+research_updates/current/*
+!research_updates/current/.gitkeep
+research_updates/archive/*
+!research_updates/archive/.gitkeep
+manuscript/advisor_feedback/rounds/*
+!manuscript/advisor_feedback/rounds/.gitkeep
 
 # Claude Code local config
 .claude/
@@ -27,6 +34,9 @@ __pycache__/
 *.egg-info/
 .venv/
 .env
+.pytest_cache/
+build/
+dist/
 
 # Experiment outputs (any output/ folder anywhere in the tree)
 **/output/
@@ -35,23 +45,42 @@ __pycache__/
 output_run.log
 **/output_run.log
 temp_exp_code/
+artifacts/
 
-# Deprecated/archived code (superseded by CKME/ and Two_stage/).
-# Keep only explicitly promoted public archive entries tracked.
-_archive/*
+# Archive payload is local by default. Track navigation/integrity controls and
+# only the two source trees that were already public before reorganization.
+_archive/**
+!_archive/**/
 !_archive/README.md
-!_archive/exp_wsc_2026/
-!_archive/exp_wsc_2026/*.md
-!_archive/exp_wsc_2026/*.txt
-!_archive/exp_wsc_2026/*.py
-!_archive/exp_wsc_2026/*.json
+!_archive/INDEX.md
+!_archive/CATALOG.tsv
+!_archive/**/ARCHIVE.md
+!_archive/manifests/README.md
+!_archive/manifests/build_manifests.sh
+!_archive/manifests/FILES.tsv
+!_archive/manifests/SHA256SUMS
+!_archive/01_experiments/diagnostics/exp_solve_test/test_solve.py
+!_archive/01_experiments/paper_history/exp_wsc_2026/*.md
+!_archive/01_experiments/paper_history/exp_wsc_2026/*.txt
+!_archive/01_experiments/paper_history/exp_wsc_2026/*.py
+!_archive/01_experiments/paper_history/exp_wsc_2026/*.json
+
+# Keep the archived RLCP checkout as a local, independently versioned repo.
+# Adding it here would otherwise create an accidental embedded Git repository.
+_archive/04_external_reproductions/rlcp/RLCP/
 
 # Generated experiment/report artifacts
 *.png
 *.html
+*.jpg
+*.tmp
+
+# The manuscript asset exporter writes only an explicit, hash-checked allowlist.
+!manuscript/generated/figures/adaptive_h/*.png
 
 # Editor
 .vscode/
+.~lock.*#
 
 # R
 .Rhistory
@@ -62,5 +91,7 @@ _archive/*
 *.out
 *.toc
 *.synctex.gz
+*.fdb_latexmk
+*.fls
 *.pdf
-!paper/*.pdf
+!paper/**/*.pdf

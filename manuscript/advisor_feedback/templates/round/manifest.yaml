@@ -1,0 +1,16 @@
+# Intake record for one advisor-returned manuscript round.
+# Replace bracketed placeholders after copying this template to rounds/.
+
+round_id: "[YYYY-MM-DD-R01-short-label]"
+received_on: "[YYYY-MM-DD]"
+advisor_or_source: "[name or role; keep private]"
+sent_snapshot:
+  path: "[path to the exact version previously shared]"
+  git_commit: "[commit, if available]"
+  sha256: "[checksum]"
+returned_files: []
+# Example returned_files entry structure (do not treat this comment as data):
+# - path: "received/returned-draft.docx"
+#   sha256: "..."
+#   original_filename: "..."
+notes: "[intake notes or none]"

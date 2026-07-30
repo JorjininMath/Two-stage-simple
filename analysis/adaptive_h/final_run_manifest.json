@@ -1,0 +1,135 @@
+{
+  "calibration_guarantee_layer": "raw_point_score",
+  "command": [
+    "experiments/adaptive_h/run_final_adaptive_h_benchmark.py",
+    "--n-workers",
+    "4",
+    "--executor",
+    "thread"
+  ],
+  "completed_at_utc": "2026-07-23T18:29:23.057555+00:00",
+  "completed_jobs": 600,
+  "config_path": "experiments/adaptive_h/final_benchmark_config.json",
+  "config_sha256": "69fecdf8df15c67df57aca209bed6f9048c466c52c9b554de134aab3fea305b7",
+  "created_at_utc": "2026-07-23T18:04:28.820495+00:00",
+  "elapsed_seconds_this_invocation": 1493.7089297499915,
+  "executor": "thread",
+  "expected_jobs": 600,
+  "git": {
+    "branch": "codex/reorganize-research-project",
+    "commit": "22f13b0f649a872edabe27aec1c09da893ff8769",
+    "dirty": false
+  },
+  "n_workers": 4,
+  "pretrained_params": {
+    "mm1_sojourn": {
+      "ell_x": 0.3,
+      "h": 0.1,
+      "lam": 0.001
+    },
+    "raised_floor_gauss": {
+      "ell_x": 0.5,
+      "h": 0.1,
+      "lam": 0.001
+    },
+    "raised_floor_t3": {
+      "ell_x": 1.0,
+      "h": 0.05,
+      "lam": 0.001
+    }
+  },
+  "pretrained_params_path": "experiments/adaptive_h/pretrained_params_final.json",
+  "pretrained_params_sha256": "16bbf9ac05fa71f6df020f1ddab3b760ecaeb47056a823b15148863fbf9f7cc5",
+  "reporting_interval_layer": "monotone_projected_cdf_generalized_inverse",
+  "resolved_config": {
+    "alpha": 0.1,
+    "base_seed": 2026072351,
+    "budgets": [
+      100,
+      250,
+      500,
+      1000
+    ],
+    "c_scale": 1.0,
+    "calibration_method": "iid",
+    "group_bins": 10,
+    "n_cal": 1000,
+    "n_macro": 50,
+    "n_test": 1000,
+    "pretrained_params_path": "experiments/adaptive_h/pretrained_params_final.json",
+    "protocol": "PROTOCOL.md",
+    "r0": 10,
+    "r_cal": 1,
+    "r_test": 1,
+    "scale_bw_factor": 1.0,
+    "scale_bw_rule": "silverman",
+    "scale_estimator": "sample_sd_nw",
+    "schema_version": "1.0",
+    "simulators": [
+      "mm1_sojourn",
+      "raised_floor_gauss",
+      "raised_floor_t3"
+    ],
+    "specification": "experiments/adaptive_h/final_benchmark_spec.md",
+    "stage1_design": "grid",
+    "t_grid_margin": {
+      "mm1_sojourn": 3.0,
+      "raised_floor_gauss": 1.0,
+      "raised_floor_t3": 3.0
+    },
+    "t_grid_size": 1000,
+    "target_law": "uniform_over_registered_bounds",
+    "test_method": "iid"
+  },
+  "schema_version": "1.0",
+  "scientific_config_hash": "835a2b0c574a19ffb7807a99664c83c206d69c7d4b234718f113f59c008305ee",
+  "seed_scheme": {
+    "formula": "base + macrorep*100000 + simulator_index*10000 + budget_index*1000 + named_offset",
+    "offsets": {
+      "calibration_x": 21,
+      "calibration_y": 22,
+      "stage1_design": 11,
+      "stage1_output": 12,
+      "test_x": 31,
+      "test_y": 32
+    }
+  },
+  "software": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "platform": "macOS-26.5.2-x86_64-i386-64bit",
+    "python": "3.11.7",
+    "scipy": "1.17.1"
+  },
+  "status": "complete",
+  "target_laws": {
+    "mm1_sojourn": {
+      "distribution": "uniform",
+      "lower": [
+        0.1
+      ],
+      "upper": [
+        0.9
+      ]
+    },
+    "raised_floor_gauss": {
+      "distribution": "uniform",
+      "lower": [
+        0.0
+      ],
+      "upper": [
+        6.283185307179586
+      ]
+    },
+    "raised_floor_t3": {
+      "distribution": "uniform",
+      "lower": [
+        0.0
+      ],
+      "upper": [
+        6.283185307179586
+      ]
+    }
+  },
+  "uses_s0": false
+}

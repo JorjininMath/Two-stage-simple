@@ -1,0 +1,1358 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{placeins}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+\graphicspath{
+  {../generated/figures/adaptive_h/}
+}
+
+\newtheorem{assumption}{Assumption}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{remark}{Remark}
+
+\newcommand{\Xcal}{\mathcal X}
+\newcommand{\Ycal}{\mathcal Y}
+\newcommand{\Hcal}{\mathcal H}
+\newcommand{\Dcal}{\mathcal D}
+\newcommand{\Gcal}{\mathcal G}
+\newcommand{\Tcal}{\mathcal T}
+\newcommand{\Pp}{\mathbb P}
+\newcommand{\E}{\mathbb E}
+\newcommand{\R}{\mathbb R}
+\newcommand{\ind}{\mathbf 1}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\inner}[2]{\left\langle #1,#2 \right\rangle}
+\newcommand{\op}{o_{\mathbb P}}
+\newcommand{\Op}{O_{\mathbb P}}
+
+% The numerical section uses only the QA-checked final benchmark assets.
+\newif\ifincludeexperiments
+\includeexperimentstrue
+
+\title{Scale-Adaptive Distributional Conformal Prediction with\\
+Conditional Kernel Mean Embeddings for Stochastic Simulation Outputs}
+\author{Jin Zhao \and Xi Chen \and Meimei Liu}
+\date{July 23, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Predictive inference for stochastic simulation must provide reliable coverage for future outputs while remaining informative under heteroscedastic and non-Gaussian response distributions. Conditional kernel mean embedding distributional conformal prediction (CKME-DCP) estimates the conditional cumulative distribution function (CDF) through smoothed indicator functions. Its output-side bandwidth is therefore part of the statistical procedure: a fixed bandwidth \(h\) induces the input-dependent standardized smoothing ratio \(h/s(x)\), where \(s(x)\) is the local response scale. We introduce the scale-adaptive rule \(h(x)=c\widehat s(x)\), with \(\widehat s(x)\) estimated from replicated training simulations. Under a heteroscedastic location-scale model, oracle smoothing \(h(x)=c s(x)\) removes this input-dependent distortion and makes the smoothed-oracle DCP score homogeneous across inputs. We also separate CKME estimation error from smooth-indicator bias and show how a consistent response-scale pattern transfers the oracle mechanism to the plug-in procedure. The coverage layer remains standard split conformal prediction: after specifying a target input law \(q_X\), iid calibration and future pairs from the induced target joint law give finite-sample marginal validity.
+\ifincludeexperiments
+In a paired benchmark with 50 macroreplications, all three bandwidth rules retain approximately 90\% raw-score marginal coverage. Oracle scale normalization substantially reduces the score-heterogeneity diagnostic on the Gaussian and heavy-tailed raised-floor models. The sample-SD plus Nadaraya--Watson plug-in's raw relative scale error declines as the training budget grows, and its score diagnostic moves toward the oracle in those two models, but its interval-score and groupwise gains are data-generating-process dependent.
+\fi
+\end{abstract}
+
+\section{Introduction}
+
+Stochastic simulation is routinely used to evaluate complex systems whose outputs are noisy, heteroscedastic, skewed, or heavy-tailed. In such settings, a predictive interval should answer a distributional question: for a future run at input \(x\), what range of outputs \(Y\) should be expected with a prescribed probability? This question is not only about mean prediction. It also requires local information about the conditional response distribution \(P_{Y\mid X=x}\), because simulation variability can change sharply across the input space.
+
+Conformal prediction (CP) provides finite-sample, distribution-free coverage guarantees under exchangeability \cite{vovk2005,shafer2008,lei2018,angelopoulos2023}. Standard residual-based CP, however, calibrates a global residual scale. Under heteroscedasticity this can produce intervals that are too wide in low-variance regions and too narrow or unstable in high-variance regions. Distributional conformal prediction (DCP) addresses this issue by constructing conformity scores from an estimated conditional CDF \cite{chernozhukov2021}. If the conditional CDF is accurate, the probability integral transform maps responses onto a common probability scale, making interval construction more adaptive to local distributional shape.
+
+For simulation output analysis, two issues remain underdeveloped. First, the coverage statement must specify the \emph{target input distribution}. Simulation users often do not care about a natural population distribution over inputs; they may care about a design distribution over the whole experimental domain, a high-risk or policy-relevant region of interest, or a finite set of planned target scenarios. We denote this input target by \(q_X\). The corresponding joint law is
+\[
+  P^q_{XY}(dx,dy)=q_X(dx)P_{Y\mid X=x}(dy),
+\]
+and the intended coverage statement is marginal under this target joint law. Split conformal validity applies cleanly only when calibration inputs and target inputs are exchangeable under the same \(q_X\). If calibration points are drawn from one design distribution and target points from another, the usual guarantee no longer follows without additional machinery such as weighted conformal calibration.
+
+Second, when CKME is used to estimate a conditional CDF, the CDF is obtained by evaluating smoothed indicator functions. The smoothing bandwidth is not a harmless numerical detail. With a fixed bandwidth \(h\), the standardized amount of smoothing is \(h/s(x)\), where \(s(x)\) is the local response scale. Thus the same scalar \(h\) oversmooths low-scale regions and undersmooths high-scale regions. This creates an avoidable distortion in the estimated DCP score, even if the conformal calibration step still protects marginal coverage.
+
+This paper focuses on the second issue while treating the target distribution as an explicit validity protocol. We use CKME as the conditional distribution estimator because it estimates a full conditional law as an RKHS-valued object and evaluates conditional CDFs through smooth test functions. This representation exposes a natural scale-adaptive smoothing rule,
+\[
+  h(x)=c\widehat s(x),
+\]
+where \(\widehat s(x)\) is estimated from training-stage simulation replications. The result is a conformal procedure that keeps the finite-sample split-CP guarantee at the target-distribution level while targeting conditional efficiency through better-scaled local CDF smoothing.
+
+The contributions are as follows.
+\begin{enumerate}[leftmargin=1.7em]
+  \item We introduce scale-adaptive CKME-DCP. It replaces a single smooth-indicator bandwidth with \(h(x)=c\widehat s(x)\), where \(\widehat s(x)\) is learned from replicated training outputs and smoothed across input space.
+  \item We show that, under a heteroscedastic location-scale model, oracle adaptive smoothing \(h(x)=c s(x)\) removes the input-dependent standardized ratio \(h/s(x)\) induced by fixed smoothing and restores homogeneity of the smoothed-oracle DCP score. We then connect the result to the implementable sample-SD plus Nadaraya--Watson estimator.
+  \item We retain the CKME conditional-CDF error decomposition into embedding estimation error and smooth-indicator bias, and show how uniform CDF error transfers to DCP score and threshold error. Split conformal validity remains estimator-agnostic when calibration and target pairs are exchangeable under the stated target law \(q_XP_{Y\mid X}\).
+  \ifincludeexperiments
+  \item We report a 50-macroreplication paired benchmark under iid target-law calibration. Oracle scaling substantially reduces the score-heterogeneity diagnostic on two raised-floor location-scale models, and the plug-in increasingly tracks the response scale, while the same benchmark identifies settings in which it does not improve interval score or groupwise coverage over fixed bandwidth.
+  \fi
+\end{enumerate}
+
+This manuscript builds on our WSC 2026 conference manuscript, \emph{Distributional Conformal Prediction with Conditional Kernel Mean Embeddings for Simulation Output Analysis}. The conference version develops fixed-bandwidth CKME-DCP and its conditional-CDF error bound. The present manuscript adds the scale-adaptive bandwidth, its oracle and plug-in theory, iid target-law calibration, the two-layer numerical evaluation protocol, and a new paired benchmark. The diagnostic adaptive calibration-site design from the conference workflow is not used here.
+
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Conformal prediction and distributional scores}
+
+Conformal prediction constructs finite-sample prediction sets by calibrating a user-chosen nonconformity score on exchangeable data \cite{vovk2005,shafer2008}. Split conformal prediction separates model fitting from calibration and therefore applies to arbitrary predictive models, including black-box regression, Gaussian-process metamodels, distribution regression, and kernel-based conditional distribution estimators \cite{lei2018,angelopoulos2023}. This estimator-agnostic validity is central for simulation output analysis because the stochastic simulator may be expensive, nonlinear, and misspecified relative to any parametric metamodel.
+
+The choice of score determines the geometry and efficiency of the resulting prediction set. Residual scores are simple, but they often behave like a global-scale correction. Locally normalized conformal methods divide a residual score by an estimated difficulty or noise scale so that interval width can vary with the input \cite{papadopoulos2011}. Conformalized quantile regression uses estimated conditional quantiles to construct locally adaptive intervals \cite{romano2019}. Distributional conformal prediction instead estimates a conditional CDF and calibrates a score on the probability scale \cite{chernozhukov2021}. Our scale correction differs from residual normalization: it changes the smooth-indicator bandwidth inside the CKME conditional-CDF estimator while retaining the DCP score \(A\{\widehat F(y\mid x)\}\). This distinction matters because the proposed mechanism targets standardized CDF smoothing rather than a residual denominator.
+
+The present paper follows the distributional route because simulation analysts often need more than two quantiles: they may want the full conditional output distribution, interval inversion at multiple confidence levels, tail probabilities, or service-level probabilities. CKME is useful in this setting because it represents the conditional law as a single object rather than as a separate regression for every threshold or quantile.
+
+\subsection{Target, local, and weighted conformal inference}
+
+Conformal validity is a marginal statement over the distribution that generates the calibration and future examples. Recent work on weighted conformal prediction, covariate shift, and localized conformal prediction makes this dependence explicit by modifying calibration weights or neighborhoods when the target covariate distribution differs from the calibration distribution \cite{tibshirani2019,hore2025}. Our target notation \(q_X\) is aligned with this literature, but our main operating regime is deliberately cleaner: the calibration and evaluation inputs are sampled from the same target distribution. This lets the paper keep the finite-sample theorem line simple while still making the scope of the guarantee visible.
+
+This distinction is important in simulation. In observational prediction, the test covariate distribution may be viewed as given by nature. In simulation, the analyst usually chooses the design points, calibration points, and evaluation scenarios. A statement such as ``90\% coverage'' is therefore incomplete unless it says whether the probability is over the whole design region, a safety-critical region of interest, a traffic peak, or a fixed portfolio of decision scenarios. Our contribution is not to solve every target-distribution mismatch problem. Rather, it is to put the target distribution into the formulation before introducing CKME-DCP and to separate matched-target validity from optional reweighting or local-calibration extensions.
+
+\subsection{Simulation metamodeling and uncertainty quantification}
+
+Classical simulation metamodeling focuses on learning the response surface of a stochastic simulator from designed experiments. Gaussian-process and stochastic-kriging methods are widely used for mean prediction and uncertainty quantification under simulation noise \cite{sacks1989,ankenman2010}. Heteroscedastic Gaussian-process models further allow the noise variance to vary across the design space and are effective for many replication-based simulation settings \cite{binois2018}. These methods provide model-based predictive distributions or credible intervals, but their nominal uncertainty statements depend on the modeling assumptions.
+
+Conformal calibration provides a complementary layer: it can wrap a fitted simulator metamodel or conditional distribution estimator and supply finite-sample marginal coverage under exchangeability. The price is that conformal calibration alone does not guarantee local efficiency. A poor score can still yield intervals that are too conservative in some regions and too aggressive in others. This paper therefore treats CKME and scale-adaptive smoothing as the score-construction layer, while split conformal calibration remains the validity layer.
+
+\subsection{Kernel embeddings for conditional distributions}
+
+Kernel mean embeddings represent probability distributions as elements of a reproducing kernel Hilbert space, and conditional kernel mean embeddings extend this representation to conditional laws \cite{song2013,muandet2017}. In the present application, the CKME representation is attractive because DCP needs repeated evaluations of \(F(t\mid x)\) over a grid of candidate response values. Once the CKME weights are computed, the conditional expectation of a smooth test function can be evaluated by a weighted sum over training outputs.
+
+The key technical issue is that the CDF indicator \(1\{Y\le t\}\) is typically not a smooth RKHS function. CKME-DCP therefore uses smooth indicator functions. This creates a bandwidth parameter on the output scale. Previous CKME-DCP use treats this bandwidth as a scalar tuning parameter. The present paper shows why that scalar choice is problematic under heteroscedasticity and proposes the scale-adaptive rule \(h(x)=c\widehat s(x)\) as a direct correction to the standardized smoothing distortion.
+
+\section{Target-Law Calibration Protocol}
+\label{sec:target}
+
+\subsection{Target input distributions and target joint laws}
+
+Let \(X\in\Xcal\subseteq\R^d\) denote a simulation input and \(Y\in\R\) the corresponding stochastic output. We write \(P_{Y\mid X=x}\) for the conditional output law at input \(x\). Unlike many supervised-learning problems, the input distribution in simulation is often chosen by the analyst. We therefore distinguish three input distributions:
+\[
+  p_{\mathrm{tr}}(x), \qquad p_{\mathrm{cal}}(x), \qquad q_X(x),
+\]
+where \(p_{\mathrm{tr}}\) is the training design distribution used to fit the conditional CDF estimator, \(p_{\mathrm{cal}}\) is the calibration design distribution, and \(q_X\) is the target distribution over which coverage is claimed.
+
+\begin{definition}[Target joint law and target coverage]
+For a user-specified target input distribution \(q_X\), define
+\[
+  P^q_{XY}(dx,dy)=q_X(dx)P_{Y\mid X=x}(dy).
+\]
+A prediction set \(\widehat C\) has marginal target coverage \(1-\alpha\) if
+\[
+  \Pp_{(X,Y)\sim P^q_{XY}}\{Y\in \widehat C(X)\}\ge 1-\alpha .
+\]
+\end{definition}
+
+This is not a new type of conformal validity; it is the standard marginal conformal statement evaluated under a user-specified target joint law. Different choices of \(q_X\) recover different simulation goals:
+\begin{itemize}[leftmargin=1.7em]
+  \item \emph{Global-domain target}: \(q_X=P_X\), or a user-chosen space-filling distribution over the simulation domain, gives ordinary marginal coverage over that domain.
+  \item \emph{Region-of-interest target}: \(q_X=P_X(\cdot\mid X\in\mathcal R)\), or another distribution concentrated on \(\mathcal R\), gives
+  \[
+    \Pp\{Y\in\widehat C(X)\mid X\in\mathcal R\}\ge 1-\alpha.
+  \]
+  This is event-conditional or group coverage for the region \(\mathcal R\), not pointwise conditional coverage at every \(x\in\mathcal R\).
+  \item \emph{Fixed-target-set average}: for planned simulation scenarios \(x_1^\star,\ldots,x_m^\star\), the discrete target
+  \[
+    q_X=m^{-1}\sum_{j=1}^m\delta_{x_j^\star}
+  \]
+  corresponds to the average scenario guarantee
+  \[
+    \frac{1}{m}\sum_{j=1}^m
+    \Pp_{Y\mid X=x_j^\star}\{Y\in\widehat C(x_j^\star)\}\ge 1-\alpha.
+  \]
+  This does not guarantee coverage at each individual scenario.
+  \item \emph{Smoothed fixed-target neighborhoods}: one may also define
+  \[
+    q_\tau(x)=m^{-1}\sum_{j=1}^m K_\tau(x-x_j^\star)
+  \]
+  and report a local guarantee around the target set rather than exactly on the discrete set.
+\end{itemize}
+
+This target notation prevents a common ambiguity. If calibration inputs are sampled globally but evaluation is restricted to a region of interest, the calibration and target pairs are generally not exchangeable. The usual split-conformal guarantee does not automatically transfer to that new target.
+
+\subsection{Matched target calibration as a design requirement}
+
+The notation \(p_{\mathrm{tr}},p_{\mathrm{cal}},q_X\) also clarifies the roles of the different data sources in a simulation study. The training design \(p_{\mathrm{tr}}\) controls where simulation budget is spent to learn the conditional distribution. It may be space-filling, adaptive, or concentrated where the simulator is difficult. The calibration distribution \(p_{\mathrm{cal}}\), however, determines the distribution of conformal scores used to set the prediction threshold. The evaluation or deployment target is \(q_X\). For the standard split-conformal proof to apply without weighting, the calibration pairs and the future target pair must be exchangeable after conditioning on the fitted estimator.
+
+This means that \(p_{\mathrm{tr}}\) can differ from \(q_X\) without invalidating split conformal calibration, provided that the fitted estimator is treated as fixed during calibration and the calibration sample itself follows \(q_X\). Such a separation is natural in simulation. One may spend the training budget broadly to learn the response surface, then spend the calibration budget on the operational region where guarantees are needed. Conversely, if calibration is global but evaluation is restricted to a high-risk region, the empirical coverage estimate is a diagnostic for that region, not a finite-sample conformal guarantee for that region.
+
+The matched target-calibration regime is the main regime of this paper. It leads to the clean theorem line:
+\[
+  (X_i^{\mathrm{cal}},Y_i^{\mathrm{cal}}),\,(X_\star,Y_\star)
+  \stackrel{\mathrm{exch.}}{\sim} P^q_{XY}
+  \quad\Longrightarrow\quad
+  \Pp\{Y_\star\in\widehat C(X_\star)\}\ge 1-\alpha .
+\]
+The statement is intentionally marginal under \(q_X\). It is not a pointwise conditional guarantee, and it does not claim validity for target distributions that were not used in calibration. This boundary also explains why bin-wise coverage, when reported, should be interpreted as a diagnostic rather than as a separate finite-sample guarantee.
+
+\begin{remark}[Why keep \(p_{\mathrm{tr}}\) separate?]
+If \(p_{\mathrm{tr}}\) is too far from \(q_X\), the CKME estimator may be inaccurate in the target region, producing wide or unstable intervals after calibration. This is an efficiency and estimation problem, not a conformal validity problem, as long as the calibration and target pairs are exchangeable. In practice, the training design should cover the support of \(q_X\) well enough for conditional distribution estimation, while the calibration design should match \(q_X\) for validity.
+\end{remark}
+
+\subsection{Split conformal prediction and DCP scores}
+
+Let \(Z=(X,Y)\in\Xcal\times\Ycal\) denote an input-output pair drawn from the target joint law \(P^q_{XY}\). For a new target input \(X_\star\), we seek a set-valued predictor \(\widehat C\) such that \(Y_\star\in\widehat C(X_\star)\) with probability at least \(1-\alpha\). Conformal prediction provides such marginal coverage under exchangeability: conditional on any fitted model or score construction, the calibration pairs and the target pair must have a joint distribution invariant to permutations.
+
+The construction relies on a nonconformity score \(S:\Xcal\times\Ycal\to\R\), where larger values indicate that a candidate pair \((x,y)\) is less compatible with the fitted model. A common regression score is the absolute residual \(S(x,y)=|y-\widehat\mu(x)|\), but the conformal argument does not depend on this particular choice. Split conformal prediction separates model fitting from calibration. A training sample \(\Dcal_{\mathrm{tr}}\) is used to fit the predictive model or distribution estimator, and an independent calibration sample \(\Dcal_{\mathrm{cal}}\) is used only to calibrate the score. For a fitted score function \(S(x,y)\), the calibration scores are
+\[
+  S_i^{\mathrm{cal}}=S(X_i^{\mathrm{cal}},Y_i^{\mathrm{cal}}),
+  \qquad i=1,\ldots,n_{\mathrm{cal}}.
+\]
+Let \(\widehat q_{1-\alpha}\) be the \(\lceil(n_{\mathrm{cal}}+1)(1-\alpha)\rceil\)-th order statistic of these scores. The split conformal prediction set is
+\[
+  \widehat C(x)=\{y:S(x,y)\le \widehat q_{1-\alpha}\}.
+\]
+Conditional on the fitted score, exchangeability of the calibration pair and the target pair is enough to obtain finite-sample marginal coverage. The score can be residual-based, quantile-based, localized, or distributional; the validity argument is the same.
+
+Standard residual-based CP can be inefficient under heteroscedasticity because a single calibrated residual threshold tends to impose a nearly global response-scale correction. Distributional conformal prediction addresses this by using a score based on an estimated conditional CDF. Let
+\[
+  F(t\mid x)=\Pp(Y\le t\mid X=x)
+\]
+denote the conditional CDF. Assume for motivation that \(F(\cdot\mid x)\) is continuous for almost every \(x\). Given an estimator \(\widehat F(\cdot\mid x)\) fitted on \(\Dcal_{\mathrm{tr}}\), DCP defines a distributional nonconformity score at a candidate point \((x,y)\). A common choice, and the one used in this paper, is
+\begin{equation}
+  S_{\widehat F}(x,y)=\abs{\widehat F(y\mid x)-1/2}.
+  \label{eq:dcp-score-background}
+\end{equation}
+More generally one may use \(A(\widehat F(y\mid x))\) for a suitable transformation \(A\). The score in \eqref{eq:dcp-score-background} is motivated by the probability integral transform: if the true continuous CDF is known, then \(F(Y\mid X)\) is uniformly distributed on \([0,1]\) and no longer carries the original response scale. Thus DCP measures nonconformity on a probability scale rather than directly on the response scale, allowing prediction sets to adapt to heteroscedasticity, skewness, and tail behavior through the estimated conditional distribution.
+
+Applying split conformal calibration to the DCP score yields
+\[
+  \widehat C_{\mathrm{DCP}}(x)
+  =
+  \{y\in\Ycal:S_{\widehat F}(x,y)\le \widehat q_{1-\alpha}\}.
+\]
+The conditional CDF estimator \(\widehat F\) can be obtained by distribution regression, quantile-based methods, or other flexible conditional distribution estimators. Its accuracy primarily affects sharpness, interval shape, and groupwise behavior, while split conformal calibration supplies marginal validity under the target law. This is why the present paper separates the target-distribution validity layer from the CKME estimation and scale-adaptive smoothing layer.
+
+\subsection{Split conformal validity under a target distribution}
+
+Let \(\Dcal_{\mathrm{tr}}\) be a training sample used to fit a conditional CDF estimator \(\widehat F\). Conditional on \(\Dcal_{\mathrm{tr}}\), let
+\[
+  (X_i^{\mathrm{cal}},Y_i^{\mathrm{cal}}),\quad i=1,\ldots,n_{\mathrm{cal}},
+\]
+be independent calibration pairs from \(P^q_{XY}\), i.e., \(X_i^{\mathrm{cal}}\sim q_X\) and \(Y_i^{\mathrm{cal}}\sim P_{Y\mid X=X_i^{\mathrm{cal}}}\). For a candidate pair \((x,y)\), use the DCP score
+\begin{equation}
+  S_{\widehat F}(x,y)=\abs{\widehat F(y\mid x)-1/2}.
+  \label{eq:dcp-score}
+\end{equation}
+Here and below, \(\widehat F(y\mid x)\) in the conformal score denotes the direct point evaluation clipped to \([0,1]\), without monotone projection over a response grid.
+Let \(\widehat q_{1-\alpha}\) be the \(\lceil(n_{\mathrm{cal}}+1)(1-\alpha)\rceil\)-th order statistic of the calibration scores. The split DCP prediction set is
+\begin{equation}
+  \widehat C(x)=\{y\in\R:S_{\widehat F}(x,y)\le \widehat q_{1-\alpha}\}.
+  \label{eq:split-set}
+\end{equation}
+
+\begin{proposition}[Target-distribution split conformal validity]
+\label{prop:target-validity}
+Suppose that the calibration pairs and the target pair are exchangeable conditional on the fitted estimator \(\widehat F\). In particular, this holds when calibration pairs and the target pair are independently drawn from the same target joint law \(P^q_{XY}\). Then the prediction set in \eqref{eq:split-set} satisfies
+\[
+  \Pp_{(X,Y)\sim P^q_{XY}}\{Y\in \widehat C(X)\}\ge 1-\alpha .
+\]
+This guarantee does not require \(\widehat F\) to be correctly specified.
+\end{proposition}
+
+Proposition~\ref{prop:target-validity} states the validity line of the paper. CKME and adaptive smoothing are not needed for marginal conformal validity. They affect the quality, shape, and conditional efficiency of the resulting intervals.
+
+\begin{remark}[When calibration and target distributions differ]
+If calibration inputs follow \(p_{\mathrm{cal}}\) but target inputs follow \(q_X\), unweighted split conformal calibration is generally calibrated for \(p_{\mathrm{cal}}\), not for \(q_X\). Under support overlap, weighted conformal calibration can be used with weights proportional to \(q_X(x)/p_{\mathrm{cal}}(x)\) \cite{tibshirani2019}. This paper treats the weighted version as part of the target-aware formulation, while the main theorem line focuses on matched calibration and target distributions.
+\end{remark}
+
+\begin{remark}[Fixed target inputs]
+A deterministic list of fixed target inputs is not automatically an exchangeable test sample from a global calibration design. If calibration and evaluation are both organized around the discrete target \(m^{-1}\sum_j\delta_{x_j^\star}\), the conformal claim is an average over the target scenarios, not a separate guarantee for every \(x_j^\star\). If nearby calibration points are more natural than exact replication at the targets, a practical alternative is to smooth the target set into
+\[
+  q_\tau(x)=m^{-1}\sum_{j=1}^m K_\tau(x-x_j^\star),
+\]
+collect or reweight calibration data for \(q_\tau\), and report coverage for that local target distribution. This is a target-distribution issue, not a bandwidth issue in the CKME CDF estimator.
+\end{remark}
+
+\section{Scale-Adaptive CKME-DCP}
+\label{sec:method}
+
+\subsection{CKME conditional CDF estimation}
+
+Conditional kernel mean embedding provides a nonparametric representation of the full conditional output law. Rather than fitting a separate model for each threshold \(t\), CKME embeds \(P_{Y\mid X=x}\) as a single RKHS-valued object and evaluates conditional expectations through inner products \cite{song2013,muandet2017}. This is useful for DCP because the score requires the conditional CDF over many candidate response values when inverting the prediction set.
+
+Let \(\Hcal_X\) and \(\Hcal_Y\) be RKHSs with kernels \(k_X\) on \(\Xcal\) and \(k_Y\) on \(\Ycal\). We assume these kernels are bounded, e.g.,
+\[
+  \sup_{x\in\Xcal}k_X(x,x)\le \kappa_X^2,
+  \qquad
+  \sup_{y\in\Ycal}k_Y(y,y)\le \kappa_Y^2.
+\]
+Let \(\phi_Y:\Ycal\to\Hcal_Y\) denote the output feature map. Analogous to a kernel mean embedding for a marginal distribution, CKME represents the conditional distribution \(P_{Y\mid X=x}\) by the conditional mean embedding
+\[
+  \mu_{Y\mid x}=\E[\phi_Y(Y)\mid X=x]\in \Hcal_Y.
+\]
+This representation is useful because, for any \(g\in\Hcal_Y\), the conditional expectation satisfies
+\[
+  \E[g(Y)\mid X=x]=\inner{\mu_{Y\mid x}}{g}_{\Hcal_Y}.
+\]
+Hence CKME provides a compact distributional representation from which many conditional expectations can be recovered.
+
+For conditional CDF estimation, \(F(t\mid x)=\Pp(Y\le t\mid X=x)\) would correspond to \(g(y)=\ind\{y\le t\}\). Ideally one would write \(F(t\mid x)=\inner{\mu_{Y\mid x}}{\ind\{\cdot\le t\}}_{\Hcal_Y}\). However, this identity requires the indicator function to belong to \(\Hcal_Y\), which generally fails for smooth output kernels such as Gaussian or Matérn kernels. We therefore replace the hard indicator with a smooth surrogate.
+
+Let \(\Psi:\R\to[0,1]\) be nondecreasing and Lipschitz, approximating \(\ind\{u\ge0\}\). For bandwidth \(h>0\), define
+\[
+  g_{t,h}(y)=\Psi\!\left(\frac{t-y}{h}\right).
+\]
+The corresponding smoothed conditional CDF is
+\[
+  F_h(t\mid x)=\E[g_{t,h}(Y)\mid X=x]
+  =
+  \inner{\mu_{Y\mid x}}{g_{t,h}}_{\Hcal_Y},
+\]
+provided \(g_{t,h}\in\Hcal_Y\). The bandwidth \(h\) therefore controls output-side smoothing in the CDF estimator.
+
+The simulation training design contains \(n_0\) distinct sites with \(r_0\) independent replications per site:
+\[
+  \Dcal_{\mathrm{tr}}
+  =
+  \{(x_i,Y_{ij}):i=1,\ldots,n_0,\ j=1,\ldots,r_0\}.
+\]
+Define the sitewise empirical output embedding
+\[
+  \overline\phi_i
+  =
+  \frac{1}{r_0}\sum_{j=1}^{r_0}\phi_Y(Y_{ij}).
+\]
+The estimator implemented in this paper is the distinct-site form of vector-valued kernel ridge regression,
+\[
+  \widehat\mu_{Y\mid x}
+  =
+  \sum_{i=1}^{n_0}a_i(x)\overline\phi_i,
+  \qquad
+  a(x)=(K_0+n_0\lambda I)^{-1}k_0(x),
+\]
+where \(K_0\) is the \(n_0\times n_0\) Gram matrix with entries
+\([K_0]_{i\ell}=k_X(x_i,x_\ell)\), and
+\[
+  k_0(x)=\big(k_X(x_1,x),\ldots,k_X(x_{n_0},x)\big)^\top .
+\]
+Here \(\lambda>0\) is the regularization parameter and \(I\) is the identity matrix. This expression is algebraically equivalent to fitting the replicated \(n_0r_0\)-row data matrix with regularization \(n_0r_0\lambda\): the repeated-input block structure makes coefficients equal within a site, and the \(r_0\) factor cancels after sitewise averaging. The distinct-site system is used because it reduces the Gram matrix from \(n_0r_0\) rows to \(n_0\) rows without changing the fitted CDF. Substituting \(\widehat\mu_{Y\mid x}\) into the smoothed CDF representation gives
+\begin{equation}
+  \widehat F_h(t\mid x)=
+  \inner{\widehat\mu_{Y\mid x}}{g_{t,h}}_{\Hcal_Y}
+  =
+  \sum_{i=1}^{n_0}a_i(x)
+  \left\{
+  \frac{1}{r_0}\sum_{j=1}^{r_0}
+  \Psi\!\left(\frac{t-Y_{ij}}{h}\right)
+  \right\}.
+  \label{eq:ckme-cdf-fixed}
+\end{equation}
+
+With an input-dependent bandwidth, we evaluate
+\begin{equation}
+  \widehat F_{h(\cdot)}(t\mid x)=
+  \sum_{i=1}^{n_0}a_i(x)
+  \left\{
+  \frac{1}{r_0}\sum_{j=1}^{r_0}
+  \Psi\!\left(\frac{t-Y_{ij}}{h(x)}\right)
+  \right\}.
+  \label{eq:ckme-cdf-adaptive}
+\end{equation}
+The CKME weights \(a(x)\) depend on the input kernel and regularization, not on the smoothing bandwidth. Thus \(h(x)\) can be changed at prediction and calibration time without retraining the CKME coefficient system.
+
+The coefficient vector \(a(x)\) is not normalized and may contain negative
+entries. The output RKHS motivates the conditional-embedding representation,
+but the numerical implementation does not materialize an output Gram matrix:
+the reproducing identity reduces evaluation to the scalar values
+\(g_{t,h(x)}(Y_{ij})\). Consequently, the membership and bounded-norm
+conditions imposed below on the smoothed-indicator class are analytical
+assumptions; they are not enforced by the software.
+
+\begin{remark}[Why not use hard empirical indicators?]
+One can estimate \(F(t\mid x)\) by replacing \(g_{t,h}(Y_i)\) in \eqref{eq:ckme-cdf-fixed} with \(\ind\{Y_i\le t\}\). For each fixed \(t\), this is a scalar kernel ridge regression problem for the binary response \(\ind\{Y\le t\}\). It avoids smoothing bias, but it is no longer the CKME inner-product estimator in \(\Hcal_Y\), and it removes the bandwidth through which local response scale is controlled. Since the contribution of this paper is scale-adaptive score construction through \(h(x)\), we use smooth indicators as the main estimator. Hard indicators are best treated as an ablation for calibrated interval performance, not as the main empirical race in conditional CDF estimation.
+\end{remark}
+
+\subsection{Local scale and adaptive bandwidth}
+\label{sec:local-scale}
+
+Here \emph{scale} means the local spread of the simulation output distribution \(Y\mid X=x\). In a location-scale model this is
+\[
+  Y=m(X)+s(X)\varepsilon,\qquad \varepsilon\perp X.
+\]
+For Gaussian outputs, \(s(x)\) is the conditional standard deviation; for Student-\(t\) outputs, it is the scale parameter multiplying the standardized noise. The fixed-bandwidth estimator uses the same response-scale smoothing everywhere. In standardized units, however, the effective bandwidth is
+\[
+  h_{\mathrm{eff}}(x)=\frac{h}{s(x)}.
+\]
+Thus a fixed \(h\) can oversmooth low-noise regions, where \(h/s(x)\) is large, and undersmooth high-noise regions, where \(h/s(x)\) is small. This motivates the adaptive rule
+\begin{equation}
+  h(x)=c\,\widehat s(x),
+  \label{eq:adaptive-rule}
+\end{equation}
+where \(c>0\) is a global multiplier and \(\widehat s(x)\) is estimated from training-stage simulation replications. The goal is to make \(h(x)/s(x)\) approximately stable across inputs.
+
+In the current implementation, the training data are collected at design sites \(x_i\) with \(r_0\) replications per site. At each site we compute the sample standard deviation
+\[
+  \widehat s_i=
+  \left\{\frac{1}{r_0-1}\sum_{j=1}^{r_0}
+  \bigl(Y_{ij}-\overline Y_i\bigr)^2\right\}^{1/2},
+\]
+then smooth \((x_i,\widehat s_i)\) over \(\Xcal\) using Nadaraya--Watson regression with a Gaussian kernel \cite{nadaraya1964,watson1964,hardle1990}:
+\[
+  \widehat s(x)
+  =
+  \max\left\{
+  s_{\min},
+  \frac{\sum_{i=1}^{n_0}w_i(x)\widehat s_i}
+       {\sum_{i=1}^{n_0}w_i(x)}
+  \right\},
+  \qquad
+  w_i(x)
+  =
+  \exp\left\{
+  -\frac12\sum_{\ell=1}^d
+  \left(\frac{x_\ell-x_{i\ell}}{b_\ell}\right)^2
+  \right\}.
+\]
+The implementation uses \(s_{\min}=10^{-3}\). The final benchmark freezes
+\[
+  b_\ell
+  =
+  1.06
+  \min\left\{
+  \operatorname{SD}(x_{1\ell},\ldots,x_{n_0\ell}),
+  \frac{\operatorname{IQR}(x_{1\ell},\ldots,x_{n_0\ell})}{1.34}
+  \right\}
+  n_0^{-1/5},
+\]
+the Silverman rule-of-thumb input bandwidth with factor one
+\cite{silverman1986}. The IQR in this formula only stabilizes the
+\emph{input-space} smoothing bandwidth; the response-scale observations being
+smoothed are always the sitewise sample standard deviations. The retired IQR
+response-scale plug-in is not used. The bandwidth \(h(x)=c\widehat s(x)\) is
+then used both for calibration scores and for prediction-set inversion.
+
+Under the location-scale model, write the standardized replications at a site as \(\varepsilon_{i1},\ldots,\varepsilon_{ir_0}\), and define
+\[
+  V_{i,r_0}
+  =
+  \left\{\frac{1}{r_0-1}\sum_{j=1}^{r_0}
+  \bigl(\varepsilon_{ij}-\overline\varepsilon_i\bigr)^2\right\}^{1/2},
+  \qquad
+  \kappa_{r_0}=\E[V_{i,r_0}].
+\]
+Then \(\widehat s_i=s(x_i)V_{i,r_0}\). With fixed \(r_0\), Nadaraya-Watson smoothing therefore targets \(\kappa_{r_0}s(x)\), not necessarily \(s(x)\) itself. The factor \(\kappa_{r_0}\) is deterministic and independent of \(x\) when the standardized noise law is input-invariant, so it does not alter the learned scale pattern and can be absorbed into the global multiplier \(c\). The purpose of \(\widehat s(x)\) is to learn this local scale pattern from designed replications rather than to estimate every feature of the conditional output distribution.
+
+The multiplier \(c\) controls the global amount of smoothing after scale normalization. When \(c\) is too small, the smoothed indicator becomes nearly discontinuous and the CKME CDF estimate can be noisy. When \(c\) is too large, the CDF estimate is biased toward an overly diffuse distribution and the DCP score loses resolution. A small sweep over \(c\) can be used to check whether \(c=1\) is a stable default. A more elaborate implementation could tune \(c\) by cross-validation on a distributional loss, but we keep the default simple because the main contribution is the input-dependent scale normalization rather than another scalar tuning routine.
+
+\subsection{Prediction-set construction}
+
+The full scale-adaptive CKME-DCP procedure is:
+\begin{enumerate}[leftmargin=1.7em]
+  \item Collect training data \(\Dcal_{\mathrm{tr}}\) and fit CKME weights with tuned \((\ell_x,\lambda)\).
+  \item Estimate the local scale function \(\widehat s(x)\) from training replications and set \(h(x)=c\widehat s(x)\).
+  \item Independently draw calibration inputs from \(q_X\), collect one output at each input, and compute the direct point-evaluated scores
+  \[
+    \widehat S_i
+    =
+    \abs{
+    \operatorname{clip}_{[0,1]}
+    \!\left\{\widehat F_{h(\cdot)}
+    (Y_i^{\mathrm{cal}}\mid X_i^{\mathrm{cal}})\right\}
+    -1/2}.
+  \]
+  These raw point scores do not use a response-grid projection.
+  \item Let \(\widehat q_{1-\alpha}\) be the split-conformal quantile of \(\widehat S_1,\ldots,\widehat S_{n_{\mathrm{cal}}}\).
+  \item Evaluate guarantee-bearing coverage by raw score membership:
+  \[
+    \ind\!\left[
+    \abs{
+    \operatorname{clip}_{[0,1]}
+    \!\left\{\widehat F_{h(\cdot)}(y\mid x)\right\}
+    -1/2}
+    \le \widehat q_{1-\alpha}
+    \right].
+  \]
+  \item For interval width and interval score, monotonize the CDF values on the response grid and report their generalized-inverse interval, as described below.
+\end{enumerate}
+
+\subsection{Implementation details}
+\label{sec:implementation}
+
+The implementation retains the training-calibration split of the WSC version but changes three parts of the workflow: calibration inputs are iid draws from the target law with one output per input, the output-side bandwidth is evaluated as a function of the prediction input, and guarantee-bearing score membership is separated from projected-interval reporting. The CKME hyperparameters \((\ell_x,\lambda)\) are selected using the training data. The fixed-bandwidth baseline also tunes a scalar \(h\). The adaptive version replaces this scalar with \(h(x)=c\widehat s(x)\), using the same CKME input weights \(a(x)\). Thus the computationally expensive distinct-site matrix solve for \((K_0+n_0\lambda I)^{-1}\) is unchanged.
+
+For the final benchmark, the input kernel and smooth step are
+\[
+  k_X(x,x')
+  =
+  \exp\left\{
+  -\frac{\norm{x-x'}^2}{2\ell_x^2}
+  \right\},
+  \qquad
+  \Psi(u)=\{1+\exp(-u)\}^{-1}.
+\]
+The logistic argument is clipped to \([-50,50]\) only for numerical
+stability. For each DGP, the triplet
+\((\ell_x,\lambda,h_{\mathrm{fixed}})\) is selected once by site-grouped
+CRPS cross-validation on a separate pretraining sample and then frozen across
+budgets and macroreplications. The oracle and plug-in arms retain the same
+\((\ell_x,\lambda)\) and replace only the output-side bandwidth.
+
+The implementation uses two distinct evaluation layers. The guarantee layer calibrates and evaluates the same raw point score, without a response-grid projection. This score membership is the primary coverage metric. The reporting layer first forms the monotone projected CDF on a response grid \(\Tcal=\{t_1<\cdots<t_M\}\):
+\[
+  \widetilde F(t_j\mid x)
+  =
+  \operatorname{clip}_{[0,1]}
+  \left\{\max_{1\le k\le j}
+  \widehat F_{h(\cdot)}(t_k\mid x)\right\}.
+\]
+It then reports the generalized-inverse endpoints
+\[
+  L(x)=\inf\{t_j:\widetilde F(t_j\mid x)\ge 1/2-\widehat q_{1-\alpha}\},
+  \qquad
+  U(x)=\inf\{t_j:\widetilde F(t_j\mid x)\ge 1/2+\widehat q_{1-\alpha}\}.
+\]
+Width and interval score are computed only from \([L(x),U(x)]\). Because the raw score set can be disconnected when the unprojected CKME CDF is nonmonotone, containment in this reporting interval need not coincide with raw score membership. Any discrepancy between the two layers is therefore reported rather than treated as part of the conformal guarantee.
+
+The implementation retains the flattened training arrays for data handling but uses the distinct-site system and sitewise smooth-indicator averages in \eqref{eq:ckme-cdf-fixed}--\eqref{eq:ckme-cdf-adaptive}. The same replication structure supplies the sitewise sample standard deviations used to estimate \(\widehat s\). Conformal calibration scores are computed at the individual-output level on a separate iid sample from \(q_X\), independent of the training sample used to fit CKME and estimate \(\widehat s\).
+
+The method has three distinct tuning components. The input kernel length scale controls how information is shared across neighboring simulation inputs. The regularization parameter controls the stability of the CKME weights. The output bandwidth controls smooth-indicator resolution. The proposed adaptive rule changes only the third component. This separation is important for interpreting future ablations: improvement over fixed-bandwidth CKME-DCP would be evidence that the response-scale smoothing correction matters, rather than evidence that the entire CKME estimator has been replaced.
+
+\section{Theory}
+\label{sec:theory}
+
+\subsection{Estimator error and conformal behavior}
+
+Let \(F^\circ(t\mid x)\) denote the oracle CDF target. Depending on context, this can be the exact conditional CDF or the smoothed oracle CDF corresponding to a chosen \(h(x)\). Define the oracle score
+\[
+  S^\circ(x,y)=\abs{F^\circ(y\mid x)-1/2}.
+\]
+All theoretical comparisons below are made over a response range \(\Tcal\). For a strict compact-range statement, assume \(\Pp(Y\in\Tcal)=1\) under the target law. For an unbounded output, this assumption is not equivalent to choosing a numerically wide grid. One must instead take \(\Tcal=\R\) when the uniform conditions hold globally, or use expanding ranges \(\Tcal_n\uparrow\R\) and track
+\[
+  \delta_{\Tcal_n}=\Pp(Y\notin\Tcal_n).
+\]
+A marginal probability bound obtained on \(\{Y\in\Tcal_n\}\) then incurs an additional term no larger than \(\delta_{\Tcal_n}\); a groupwise result incurs the corresponding maximum group-conditional tail probability. The numerical guarantee-bearing score is evaluated directly at each observed \(Y\), including values outside the finite response grid; only projected-interval reporting uses that grid.
+
+\begin{assumption}[Uniform CDF error]
+\label{ass:uniform}
+There exists \(\epsilon_n=\op(1)\) such that
+\[
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \abs{\widehat F(t\mid x)-F^\circ(t\mid x)}
+  \le \epsilon_n
+\]
+with probability tending to one.
+\end{assumption}
+
+\begin{assumption}[Regular oracle score distribution]
+\label{ass:score}
+The marginal distribution of \(S^\circ(X,Y)\), with \(X\sim q_X\), is continuous and has a density \(g^\circ\) bounded away from zero and infinity in a neighborhood of its \((1-\alpha)\)-quantile \(q^\circ_{1-\alpha}\).
+\end{assumption}
+
+\begin{proposition}[CDF error transfers to DCP score and threshold error]
+\label{prop:error-transfer}
+Suppose Assumptions~\ref{ass:uniform}--\ref{ass:score} hold, and let
+\(\delta_{\Tcal}=\Pp(Y\notin\Tcal)\) under the target law. Then
+\[
+  \sup_{x\in\Xcal,\ y\in\Tcal}
+  \abs{S_{\widehat F}(x,y)-S^\circ(x,y)}
+  \le \epsilon_n
+\]
+with probability tending to one, and the split-conformal threshold satisfies
+\[
+  \abs{\widehat q_{1-\alpha}-q^\circ_{1-\alpha}}
+  =
+  \Op\!\left(
+  \epsilon_n+n_{\mathrm{cal}}^{-1/2}+\delta_{\Tcal}
+  \right).
+\]
+For compactly supported outputs, \(\delta_{\Tcal}=0\). For unbounded outputs,
+the same statement applies to expanding \(\Tcal_n\) when
+\(\delta_{\Tcal_n}\to0\).
+\end{proposition}
+
+This proposition clarifies the role of the conditional CDF estimator. Finite-sample marginal validity comes from conformal calibration. CDF accuracy controls how close the calibrated prediction set is to an oracle DCP set and therefore affects width, interval score, and group-conditional coverage.
+
+\subsection{Why scale-adaptive smoothing helps}
+
+Assume the heteroscedastic location-scale model
+\begin{equation}
+  Y=m(X)+s(X)\varepsilon,\qquad \varepsilon\perp X,\qquad s(x)>0.
+  \label{eq:location-scale}
+\end{equation}
+For fixed \(h\), the smoothed oracle CDF is
+\[
+  F_h^\circ(t\mid x)=
+  \E\left[
+  \Psi\!\left(\frac{t-Y}{h}\right)\middle|X=x
+  \right].
+\]
+Writing \(z=(t-m(x))/s(x)\), we have
+\begin{equation}
+  F_h^\circ(t\mid x)=
+  \E\left[
+  \Psi\!\left(\frac{z-\varepsilon}{h/s(x)}\right)
+  \right].
+  \label{eq:fixed-distortion}
+\end{equation}
+Thus the standardized smoothing ratio \(h/s(x)\) varies with \(x\). A fixed \(h\) does not represent the same CDF resolution in low- and high-variance regions.
+
+Now set \(h(x)=c s(x)\). The smoothed oracle CDF becomes
+\begin{equation}
+  F_c^\circ(t\mid x)=
+  H_c\!\left(\frac{t-m(x)}{s(x)}\right),
+  \qquad
+  H_c(z)=\E\left[\Psi\!\left(\frac{z-\varepsilon}{c}\right)\right].
+  \label{eq:adaptive-representation}
+\end{equation}
+
+\begin{theorem}[Smoothed-score homogeneity under oracle adaptive bandwidth]
+\label{thm:homogeneity}
+Suppose \eqref{eq:location-scale} holds and \(h(x)=c s(x)\). For any measurable score transform \(A:[0,1]\to\R\), define
+\[
+  S_c^\circ(x,y)=A(F_c^\circ(y\mid x)).
+\]
+Then
+\[
+  S_c^\circ(X,Y)\mid X=x
+  \overset{d}{=}
+  A(H_c(\varepsilon)).
+\]
+Therefore the conditional distribution of the smoothed-oracle score does not depend on \(x\).
+\end{theorem}
+
+Theorem~\ref{thm:homogeneity} is the central scale-adaptive argument. Exact DCP with the true continuous CDF already has probability-integral-transform homogeneity. CKME-DCP uses smoothed indicators, and fixed smoothing can break this homogeneity through \(h/s(x)\). Adaptive smoothing restores it at the smoothed-oracle level.
+
+\begin{assumption}[Uniform relative scale-pattern consistency]
+\label{ass:scale}
+For a fixed \(r_0\ge 2\), suppose \(0<\kappa_{r_0}<\infty\), where \(\kappa_{r_0}\) is the expected standardized sample standard deviation defined in Section~\ref{sec:local-scale}. The plug-in scale estimator satisfies
+\[
+  \Delta_n
+  =
+  \sup_{x\in\Xcal}
+  \abs{\frac{\widehat s(x)}{\kappa_{r_0}s(x)}-1}
+  =\op(1).
+\]
+\end{assumption}
+
+Assumption~\ref{ass:scale} is a high-level condition on the full scale estimator, not a consistency theorem proved here. Standard Nadaraya--Watson results motivate it under regular design density, smoothness, moment, and bandwidth conditions \cite{hardle1990}; the fixed-\(r_0\) sitewise sample standard deviations act as noisy regression responses with conditional mean \(\kappa_{r_0}s(x)\). Boundary correction and higher-dimensional rates require additional conditions.
+
+\begin{assumption}[Standardized moment bound]
+\label{ass:std-moment}
+For the response range \(\Tcal\),
+\[
+  M_{\Tcal}
+  =
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \E\left[
+  \abs{\frac{t-m(x)}{s(x)}-\varepsilon}
+  \middle|X=x
+  \right]
+  <\infty.
+\]
+The smooth step function \(\Psi\) is Lipschitz with constant \(L_\Psi\).
+\end{assumption}
+
+\begin{proposition}[Plug-in adaptive bandwidth is close to oracle adaptive bandwidth]
+\label{prop:plugin-oracle}
+Suppose the location-scale model \eqref{eq:location-scale} holds and Assumptions~\ref{ass:scale}--\ref{ass:std-moment} hold. Let
+\[
+  F_{\widehat h}^{\circ}(t\mid x)
+  =
+  \E\left[
+  \Psi\!\left(\frac{t-Y}{c\widehat s(x)}\right)
+  \middle|X=x
+  \right]
+\]
+and let \(\bar c=c\kappa_{r_0}\). Let \(F_{\bar c}^\circ\) be the oracle adaptive smoothed CDF in \eqref{eq:adaptive-representation} with \(c\) replaced by \(\bar c\). Then
+\[
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \abs{F_{\widehat h}^{\circ}(t\mid x)-F_{\bar c}^\circ(t\mid x)}
+  =
+  \Op(\Delta_n)
+  =
+  \op(1).
+\]
+Thus fixed-\(r_0\) sample-SD smoothing is asymptotically equivalent, under
+Assumption~\ref{ass:scale}, to oracle scale-adaptive smoothing with a
+different global multiplier. Since \(\bar c\) is constant in \(x\),
+\(\kappa_{r_0}\) can in principle be absorbed into the scalar tuning
+parameter and does not affect oracle score homogeneity. In the final
+benchmark, however, both the oracle and plug-in arms use the unadjusted
+default \(c=1\), so their finite-sample global-multiplier difference remains.
+\end{proposition}
+
+\subsection{CKME consistency and group-conditional behavior}
+
+Let the smoothed oracle target be
+\[
+  F_{h(\cdot)}^\circ(t\mid x)=
+  \E[g_{t,h(x)}(Y)\mid X=x].
+\]
+
+\begin{assumption}[Uniform CKME embedding consistency]
+\label{ass:ckme}
+For the chosen kernels and regularization sequence,
+\[
+  \sup_{x\in\Xcal}
+  \norm{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}
+  =\op(1).
+\]
+\end{assumption}
+
+\begin{assumption}[Bounded smoothed-indicator class]
+\label{ass:g}
+For the target range \(\Tcal\),
+\[
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \norm{g_{t,h(x)}}_{\Hcal_Y}<\infty.
+\]
+\end{assumption}
+
+\begin{assumption}[Smooth-step approximation to the exact CDF]
+\label{ass:smoothing-bias}
+The conditional density \(f(\cdot\mid x)\) exists and satisfies
+\[
+  \sup_{x\in\Xcal,\ y\in\R}f(y\mid x)\le B<\infty.
+\]
+Moreover,
+\[
+  C_\Psi
+  =
+  \int_{-\infty}^{\infty}
+  \abs{\Psi(u)-\ind\{u\ge0\}}\,du
+  <\infty.
+\]
+\end{assumption}
+
+\begin{proposition}[CKME estimation error and smooth-indicator bias]
+\label{prop:ckme-exact-cdf}
+Under Assumptions~\ref{ass:ckme}--\ref{ass:smoothing-bias}, define
+\[
+  C_{h(\cdot)}
+  =
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \norm{g_{t,h(x)}}_{\Hcal_Y}.
+\]
+Then
+\[
+\begin{aligned}
+  &\sup_{x\in\Xcal,\ t\in\Tcal}
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F(t\mid x)}\\
+  &\quad\le
+  C_{h(\cdot)}
+  \sup_{x\in\Xcal}
+  \norm{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}
+  +
+  B C_\Psi\sup_{x\in\Xcal}h(x).
+\end{aligned}
+\]
+For fixed \(h\), this reduces to the WSC error decomposition
+\[
+  \sup_{x,t}\abs{\widehat F_h(t\mid x)-F(t\mid x)}
+  \le
+  C_h\sup_x
+  \norm{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}
+  +
+  B C_\Psi h.
+\]
+\end{proposition}
+
+\begin{assumption}[Finite-partition oracle score regularity]
+\label{ass:group}
+Let \(\Gcal_1,\ldots,\Gcal_K\) be a fixed finite partition of \(\Xcal\), with \(\Pp(X\in\Gcal_k)>0\). For the oracle adaptive score \(S_c^\circ(X,Y)\), the groupwise distribution functions
+\[
+  G_k(q)=\Pp\{S_c^\circ(X,Y)\le q\mid X\in\Gcal_k\}
+\]
+are Lipschitz in a common neighborhood of \(q^\circ_{1-\alpha}\), uniformly over \(k=1,\ldots,K\).
+\end{assumption}
+
+\begin{proposition}[CKME embedding consistency implies smoothed-CDF consistency]
+\label{prop:ckme-cdf}
+Under Assumptions~\ref{ass:ckme}--\ref{ass:g},
+\[
+  \sup_{x\in\Xcal,\ t\in\Tcal}
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F_{h(\cdot)}^\circ(t\mid x)}
+  =\op(1).
+\]
+\end{proposition}
+
+Proposition~\ref{prop:ckme-exact-cdf} separates estimation error from smoothing bias relative to the exact CDF. The adaptive-homogeneity analysis instead targets \(F_{h(\cdot)}^\circ\), because \(h(x)=c s(x)\) with fixed \(c\) need not vanish. Combining Proposition~\ref{prop:ckme-cdf} with Proposition~\ref{prop:error-transfer} gives score and threshold stability relative to that smoothed oracle. Combining those results with Theorem~\ref{thm:homogeneity} yields the following group-conditional implication.
+
+\begin{theorem}[Asymptotic finite-partition group coverage]
+\label{thm:group}
+Suppose the location-scale model holds, oracle adaptive smoothing \(h(x)=c s(x)\) is used, \(n_0,n_{\mathrm{cal}}\to\infty\), and Assumptions~\ref{ass:uniform}, \ref{ass:score}, \ref{ass:ckme}, \ref{ass:g}, and \ref{ass:group} hold with \(F^\circ=F_c^\circ\). Assume either that \(Y\in\Tcal\) almost surely, that the uniform conditions hold on \(\R\), or that expanding ranges satisfy
+\[
+  \max_{1\le k\le K}
+  \Pp(Y\notin\Tcal_n\mid X\in\Gcal_k)\to0.
+\]
+Then
+\[
+  \max_{1\le k\le K}
+  \abs{
+  \Pp\{Y\in\widehat C(X)\mid X\in\Gcal_k\}
+  -(1-\alpha)
+  }
+  \to 0
+\]
+in probability.
+\end{theorem}
+
+\begin{corollary}[Plug-in scale-adaptive CKME-DCP]
+\label{cor:plugin-group}
+Suppose the location-scale model holds, the plug-in bandwidth \(h(x)=c\widehat s(x)\) is used, \(n_0,n_{\mathrm{cal}}\to\infty\), and Assumptions~\ref{ass:score}, \ref{ass:scale}, \ref{ass:std-moment}, \ref{ass:ckme}, \ref{ass:g}, and \ref{ass:group} hold with the oracle multiplier \(\bar c=c\kappa_{r_0}\). Also suppose the response-range condition of Theorem~\ref{thm:group} holds. If the CKME estimator is uniformly consistent for the plug-in smoothed oracle \(F_{\widehat h}^{\circ}\), then the conclusion of Theorem~\ref{thm:group} continues to hold:
+\[
+  \max_{1\le k\le K}
+  \abs{
+  \Pp\{Y\in\widehat C(X)\mid X\in\Gcal_k\}
+  -(1-\alpha)
+  }
+  \to 0
+\]
+in probability.
+\end{corollary}
+
+The theorem does not claim finite-sample pointwise conditional coverage, which is impossible in general without stronger assumptions. It states that, in the location-scale regime targeted here, adaptive smoothing plus uniform CKME CDF consistency can make DCP scores asymptotically homogeneous over fixed finite input partitions.
+
+\ifincludeexperiments
+\section{Numerical Evidence}
+\label{sec:experiments}
+
+\subsection{Locked benchmark and paired design}
+
+The final benchmark follows the matched target-law protocol used in the validity result. Stage~1 uses an equally spaced input grid, \(r_0=10\) replications per site, and budgets \(B=n_0r_0\in\{100,250,500,1000\}\). For every macroreplication, the calibration and test inputs are fresh iid draws from the same uniform target law \(q_X\). Each of the \(n_{\mathrm{cal}}=1000\) calibration inputs and \(n_{\mathrm{test}}=1000\) test inputs receives one independent simulator output. The diagnostic site-selection score \(S^0\) is not used.
+
+We compare three bandwidth rules on exactly the same Stage-1, calibration, and test data within a macroreplication. The fixed arm uses the scalar \(h\) selected once during separate site-grouped pretraining. The oracle arm uses \(h(x)=s(x)\), and the implementable arm uses \(h(x)=\widehat s(x)\), where \(\widehat s\) is the Gaussian Nadaraya--Watson smoother of the Stage-1 sample standard deviations. The multiplier is fixed at \(c=1\), and the input-space smoothing bandwidth uses a frozen Silverman rule with factor one. Unlike the fixed arm, the plug-in multiplier and its input-space bandwidth factor are not tuned. This is therefore a frozen-default mechanism benchmark: it compares input-dependent bandwidth forms under a locked protocol, but it does not isolate local scale adaptation from global-multiplier tuning or constitute a comprehensive external-baseline comparison. All reported means and Monte Carlo standard errors use 50 independent macroreplications.
+
+The three one-dimensional data-generating processes (DGPs) are
+\begin{align*}
+  \text{M/M/1:}\quad&
+  Y\mid \rho\sim\operatorname{Exponential}(\text{rate}=1-\rho),
+  &&\rho\in[0.1,0.9],\quad s(\rho)=\frac{1}{1-\rho},\\
+  \text{Gaussian:}\quad&
+  Y=e^{x/10}\sin x+s(x)\varepsilon,
+  &&\varepsilon\sim N(0,1),\\
+  \text{Student-}t_3:\quad&
+  Y=e^{x/10}\sin x+s(x)\varepsilon,
+  &&\varepsilon\sim t_3/\sqrt{3},
+\end{align*}
+where \(x\in[0,2\pi]\) and \(s(x)=0.10+0.20(x-\pi)^2\) for the last two models. The variance normalization makes \(s(x)\) the conditional standard deviation in both raised-floor models.
+\FloatBarrier
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{final_scale_functions.pdf}
+\caption{Conditional response scales in the three final benchmark DGPs. The oracle arm uses these functions; the plug-in arm estimates their pattern using only replicated Stage-1 outputs.}
+\label{fig:final-scales}
+\end{figure}
+
+Coverage is evaluated by membership under the raw point score, which is the guarantee-bearing layer. We separately report coverage of the projected-CDF generalized-inverse interval and the fraction of test points on which its membership differs from raw score-set membership. Width and the interval score
+\[
+  \operatorname{IS}_\alpha(L,U;Y)
+  =
+  (U-L)
+  +
+  \frac{2}{\alpha}(L-Y)_+
+  +
+  \frac{2}{\alpha}(Y-U)_+
+\]
+are computed from the projected interval \([L,U]\) \cite{gneiting2007}. Mean and worst group gaps are descriptive absolute deviations from 0.90 across ten equal-count input bins; they are not finite-sample conditional-coverage guarantees.
+
+Two additional diagnostics probe the proposed mechanism. At each test point,
+the raw relative scale error is
+\[
+  \abs{\widehat s(X)/s(X)-1},
+\]
+which is averaged over test points and then over macroreplications. Because the
+benchmark does not divide by \(\kappa_{10}\) or retune \(c\), this quantity
+includes global-multiplier error and is not the \(\Delta_n\) in
+Assumption~\ref{ass:scale}. For score homogeneity, each macroreplication
+partitions the test inputs into ten equal-count bins, computes the 45 pairwise
+empirical Kolmogorov--Smirnov distances between raw-score distributions, and
+records their maximum. The reported value averages this maximum over
+macroreplications. It is a relative diagnostic without a permutation or null
+baseline; taking a maximum over 45 finite-sample comparisons makes a positive
+value expected even under exact homogeneity.
+
+\subsection{Marginal validity and main performance comparison}
+
+Table~\ref{tab:final-adaptive-h} reports the main \(B=1000\) results. Raw-score marginal coverage ranges from 0.898 to 0.902 across all nine DGP--method combinations, with coverage Monte Carlo standard errors near 0.002. Thus the matched-target split-conformal score sets retain the intended marginal coverage across bandwidth rules.
+
+\input{../generated/tables/adaptive_h/final_adaptive_h_B1000_table.tex}
+
+Raw score-set coverage must not be read as coverage of the projected reporting
+interval. For M/M/1 with fixed bandwidth, projected-interval coverage is
+\(0.855\), compared with raw coverage \(0.899\), and the membership
+disagreement rate is \(0.049\). For the other eight \(B=1000\) combinations,
+projected-interval coverage lies between \(0.900\) and \(0.903\), and
+disagreement lies between \(0.003\) and \(0.009\). Hence the finite-sample
+guarantee belongs to the raw score set; the projected interval and its
+width and interval score are explicitly reporting-layer summaries.
+
+The oracle mechanism is clearest on the two raised-floor models. Relative to fixed bandwidth, the oracle reduces the maximum pairwise score-distribution KS diagnostic from \(0.531\) to \(0.296\) under Gaussian noise and from \(0.718\) to \(0.437\) under Student-\(t_3\) noise. The corresponding worst-group gaps fall from \(0.112\) to \(0.084\) and from \(0.112\) to \(0.088\). Oracle interval score also improves from \(3.334\) to \(3.198\) and from \(3.576\) to \(3.373\), respectively.
+
+The M/M/1 case is an important boundary. Fixed and oracle score KS diagnostics are similar (\(0.224\) and \(0.231\)), while the oracle interval score is worse (\(12.463\) versus \(10.983\)) despite its narrower interval. This comparison must be interpreted together with the fixed arm's projected-interval undercoverage and score-set disagreement. It shows that population scale normalization alone does not guarantee practical improvement for every DGP, fixed multiplier, training budget, and interval-projection rule.
+
+\subsection{What the implementable plug-in tracks}
+
+The raw relative scale error declines as Stage-1 information grows. From \(B=100\) to \(B=1000\), it decreases from \(0.182\) to \(0.075\) for M/M/1, from \(0.920\) to \(0.353\) for the Gaussian model, and from \(0.817\) to \(0.308\) for the Student-\(t_3\) model. These values show increasing, but still partial, tracking of the local scale; they do not establish the uniform consistency assumed in the theory. Figure~\ref{fig:effective-ratio} shows the corresponding stabilization of \(h(x)/s(x)\).
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{final_effective_bandwidth_ratio.pdf}
+\caption{Effective bandwidth ratio \(h(x)/s(x)\) at \(B=1000\). Curves average macroreplication-level bin means; error bars are Monte Carlo standard errors. With fixed \(r_0\), the plug-in may differ from the oracle by a global multiplier as well as by finite-sample smoothing error.}
+\label{fig:effective-ratio}
+\end{figure}
+
+On the raised-floor models, the plug-in moves the raw-score diagnostic in the oracle direction. At \(B=1000\), its maximum pairwise KS is \(0.468\) for Gaussian noise and \(0.539\) for Student-\(t_3\) noise, between the corresponding fixed and oracle values. This pattern is consistent with the scale-normalization mechanism but is not a calibrated test of exact homogeneity. The improvement is not universal: on M/M/1, the plug-in KS is \(0.286\), above both fixed and oracle.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{final_raw_score_homogeneity.pdf}
+\caption{Maximum pairwise empirical KS distance between raw-score distributions in ten equal-count input bins. Points are means over 50 macroreplications and error bars are Monte Carlo standard errors. This is a mechanism diagnostic, not a coverage guarantee.}
+\label{fig:score-homogeneity}
+\end{figure}
+
+Practical interval performance is similarly mixed. Paired plug-in-minus-fixed mean width differences (MCSEs) are \(-0.883\) (\(0.064\)), \(-0.124\) (\(0.007\)), and \(-0.209\) (\(0.011\)) for M/M/1, Gaussian, and Student-\(t_3\), respectively. The corresponding paired interval-score differences are \(1.585\) (\(0.072\)), \(0.038\) (\(0.009\)), and \(-0.090\) (\(0.010\)); lower is better. Thus the plug-in produces narrower projected intervals in all three examples, but improves interval score only for Student-\(t_3\). Its worst raw-score group gaps, \(0.127\), \(0.117\), and \(0.068\) for Gaussian, Student-\(t_3\), and M/M/1, also do not uniformly retain the oracle improvements.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{final_binwise_coverage.pdf}
+\caption{Raw-score coverage across ten equal-count input bins at \(B=1000\). Lines average macroreplication-level bin coverage; error bars are Monte Carlo standard errors. The horizontal line is the 0.90 marginal target.}
+\label{fig:binwise-coverage}
+\end{figure}
+
+\subsection{Numerical audit and interpretation}
+
+The final audit contains all 600 DGP--budget--macroreplication jobs, all 1,800 arm-level per-point files, identical paired test data, finite metrics, complete score diagnostics, and hash-bound publication assets. One warning remains in the reporting layer: two of 1,800 arm files exceed a 2\% projected-interval grid-boundary rate, both for the fixed arm at \(B=100\); the maximum is 30.1\% in one macroreplication. The mean boundary rate across arm files is \(2.14\times10^{-4}\), and no \(B=1000\) arm has a boundary hit. Raw-score coverage is unaffected.
+
+The final evidence therefore supports three distinct conclusions. First, matched iid target-law calibration delivers the intended marginal coverage for the raw score sets, while projected-interval coverage must be audited separately. Second, oracle response-scale normalization substantially reduces the score-heterogeneity diagnostic in the two clean raised-floor location-scale examples, but not in the finite-sample M/M/1 experiment. Third, the sample-SD plus Nadaraya--Watson method increasingly tracks the response scale and can move the score diagnostic toward the oracle, yet the current untuned \(c=1\) implementation does not provide a uniform interval-score or groupwise-coverage improvement. These distinctions keep the empirical claim aligned with the theory and identify global multiplier selection, scale-smoother refinement, projection-aware interval construction, a KS null benchmark, and protocol-matched external baselines as the main next questions.
+
+\fi
+
+\section{Positioning Relative to Existing CP Methods}
+\label{sec:positioning}
+
+The proposed method does not make conformal validity depend on CKME itself. Split conformal validity is estimator-agnostic once calibration and target samples are exchangeable under the target law. CKME enters through the score-construction layer, where a better conditional CDF estimator and a better smoothing scale can improve interval efficiency and groupwise behavior. The target-aware formulation therefore separates two roles:
+\[
+  \begin{aligned}
+  &\text{target-aware calibration specifies where validity holds,}\\
+  &\text{scale-adaptive CKME targets the DCP score used for efficiency.}
+  \end{aligned}
+\]
+
+Conformalized quantile regression adapts interval endpoints through estimated conditional quantiles \cite{romano2019}. Distribution regression versions of DCP estimate the conditional CDF through threshold-indexed regressions \cite{chernozhukov2021}. Localized and weighted conformal methods modify the calibration distribution or score weighting to improve local guarantees \cite{tibshirani2019,hore2025}. CKME-DCP is complementary: it estimates a single conditional distributional object and uses smooth test functions to evaluate CDFs. This representation creates a bandwidth parameter whose local scaling can be matched to the response scale.
+
+\section{Discussion}
+\label{sec:discussion}
+
+This paper separates the validity layer and the score-efficiency layer in CKME-DCP for stochastic simulation outputs. The validity layer is the split-conformal argument under a stated target joint law \(P^q_{XY}=q_XP_{Y\mid X}\). The score-efficiency layer is the CKME conditional CDF estimator and, in particular, the smooth-indicator bandwidth used to evaluate DCP scores.
+
+The target formulation makes the coverage statement explicit. Global-domain coverage, region-of-interest coverage, fixed-target-set average coverage, and smoothed fixed-target local coverage are different claims because they integrate over different input laws. The finite-sample split-conformal guarantee applies cleanly in the matched target-calibration setting, while target mismatch requires reweighting or a separate calibration design.
+
+The scale-adaptive bandwidth addresses a different problem. Under heteroscedasticity, fixed smoothing creates the standardized ratio \(h/s(x)\), so the same output-side bandwidth can represent different amounts of smoothing in low- and high-variance regions. Setting \(h(x)=c\widehat s(x)\) aligns the smoothed indicator with local response scale. The oracle analysis shows the mechanism.
+
+\ifincludeexperiments
+The present experiments focus on calibrated score-set and projected-interval performance rather than raw CDF estimation alone. Raw CDF and score diagnostics are useful for mechanism checks, but raw score-set coverage, projected-interval coverage, width, interval score, and groupwise stability must remain distinct. The numerical evidence supports oracle scale normalization as a mechanism on the two raised-floor models and shows that the implementable estimator increasingly tracks their scale patterns. Its downstream interval and groupwise effects remain DGP-dependent, especially for M/M/1. Region-of-interest targets, projection-aware interval construction, fair scalar-multiplier selection, a null-calibrated score diagnostic, and refreshed external conformal or simulation-UQ baselines are necessary next steps before a journal-level performance claim.
+\fi
+
+\appendix
+
+\section{Proofs}
+\label{app:proofs}
+
+\subsection{Proof of Proposition~\ref{prop:target-validity}}
+
+Condition on the training data and on the fitted estimator \(\widehat F\). Under the stated exchangeability condition, the calibration scores
+\[
+  S_i^{\mathrm{cal}}=S_{\widehat F}(X_i^{\mathrm{cal}},Y_i^{\mathrm{cal}}),
+  \qquad i=1,\ldots,n_{\mathrm{cal}},
+\]
+and the target score
+\[
+  S_\star=S_{\widehat F}(X_\star,Y_\star)
+\]
+are exchangeable. Let
+\[
+  k=\left\lceil (n_{\mathrm{cal}}+1)(1-\alpha)\right\rceil .
+\]
+If \(k\le n_{\mathrm{cal}}\), \(\widehat q_{1-\alpha}\) is the \(k\)-th order statistic of the calibration scores; if \(k=n_{\mathrm{cal}}+1\), the usual convention is \(\widehat q_{1-\alpha}=+\infty\), in which case the claim is trivial. For \(k\le n_{\mathrm{cal}}\), the rank of \(S_\star\) among the \(n_{\mathrm{cal}}+1\) exchangeable scores is uniform up to ties, and the conservative tie convention gives
+\[
+  \Pp\{S_\star\le \widehat q_{1-\alpha}\mid \Dcal_{\mathrm{tr}},\widehat F\}
+  \ge
+  \frac{k}{n_{\mathrm{cal}}+1}
+  \ge
+  1-\alpha .
+\]
+Since \(Y_\star\in\widehat C(X_\star)\) is exactly the event \(S_\star\le\widehat q_{1-\alpha}\), taking expectation over the training data proves
+\[
+  \Pp_{(X,Y)\sim P^q_{XY}}\{Y\in\widehat C(X)\}\ge 1-\alpha .
+\]
+
+\subsection{Proof of Proposition~\ref{prop:error-transfer}}
+
+Let \(\Pi(u)=\operatorname{clip}_{[0,1]}(u)\) and
+\(A(u)=|u-1/2|\). The map \(A\) is one-Lipschitz, \(\Pi\) is
+nonexpansive, and \(F^\circ(t\mid x)\in[0,1]\). On the event in
+Assumption~\ref{ass:uniform},
+\[
+\begin{aligned}
+  \abs{S_{\widehat F}(x,y)-S^\circ(x,y)}
+  &=
+  \abs{
+  A\!\left(\Pi\{\widehat F(y\mid x)\}\right)
+  -
+  A\!\left(F^\circ(y\mid x)\right)
+  }  \\
+  &\le
+  \abs{\Pi\{\widehat F(y\mid x)\}-F^\circ(y\mid x)}\\
+  &\le
+  \abs{\widehat F(y\mid x)-F^\circ(y\mid x)}
+  \le \epsilon_n
+\end{aligned}
+\]
+uniformly over \(x\in\Xcal\) and \(y\in\Tcal\). This proves the score perturbation bound.
+
+For the threshold statement, let \(\widehat G_n\) and \(G_n^\circ\) be the
+empirical CDFs of the fitted and oracle calibration scores, respectively,
+and let
+\[
+  \widehat\delta_{\Tcal}
+  =
+  \frac{1}{n_{\mathrm{cal}}}
+  \sum_{i=1}^{n_{\mathrm{cal}}}
+  \ind\{Y_i^{\mathrm{cal}}\notin\Tcal\}.
+\]
+The in-range score bound implies, for every \(u\),
+\[
+  G_n^\circ(u-\epsilon_n)-\widehat\delta_{\Tcal}
+  \le
+  \widehat G_n(u)
+  \le
+  G_n^\circ(u+\epsilon_n)+\widehat\delta_{\Tcal}.
+\]
+Moreover,
+\(\widehat\delta_{\Tcal}
+=\delta_{\Tcal}+\Op(n_{\mathrm{cal}}^{-1/2})\), and the empirical oracle
+score CDF differs uniformly from its population CDF by
+\(\Op(n_{\mathrm{cal}}^{-1/2})\). Since the oracle score density is bounded
+away from zero near \(q^\circ_{1-\alpha}\), inversion of the preceding
+bracketing inequalities, including the \(O(n_{\mathrm{cal}}^{-1})\)
+finite-sample quantile correction, gives
+\[
+  \abs{\widehat q_{1-\alpha}-q^\circ_{1-\alpha}}
+  =
+  \Op\!\left(
+  \epsilon_n+n_{\mathrm{cal}}^{-1/2}+\delta_{\Tcal}
+  \right).
+\]
+
+\subsection{Proof of Theorem~\ref{thm:homogeneity}}
+
+Under \(Y=m(x)+s(x)\varepsilon\) and \(h(x)=c s(x)\),
+\[
+  F_c^\circ(y\mid x)=
+  H_c\!\left(\frac{y-m(x)}{s(x)}\right).
+\]
+Evaluating at \(Y=m(x)+s(x)\varepsilon\) gives
+\[
+  F_c^\circ(Y\mid X=x)
+  =
+  H_c(\varepsilon).
+\]
+Because \(\varepsilon\perp X\), the conditional distribution of \(H_c(\varepsilon)\) given \(X=x\) is the same for all \(x\). Applying any measurable transform \(A\) preserves equality in distribution, so
+\[
+  S_c^\circ(X,Y)\mid X=x
+  =
+  A(F_c^\circ(Y\mid X=x))
+  \overset{d}{=}
+  A(H_c(\varepsilon)).
+\]
+
+\subsection{Proof of Proposition~\ref{prop:plugin-oracle}}
+
+Write
+\[
+  z_x(t)=\frac{t-m(x)}{s(x)}.
+\]
+Under the location-scale model,
+\[
+  \frac{t-Y}{c\widehat s(x)}
+  =
+  \frac{z_x(t)-\varepsilon}{c\kappa_{r_0}}
+  \frac{\kappa_{r_0}s(x)}{\widehat s(x)},
+  \qquad
+  \frac{t-Y}{c\kappa_{r_0}s(x)}
+  =
+  \frac{z_x(t)-\varepsilon}{c\kappa_{r_0}}.
+\]
+On the event \(\Delta_n<1/2\),
+\[
+  \sup_{x\in\Xcal}
+  \abs{\frac{\kappa_{r_0}s(x)}{\widehat s(x)}-1}
+  =
+  \sup_{x\in\Xcal}
+  \abs{\frac{1}{\widehat s(x)/\{\kappa_{r_0}s(x)\}}-1}
+  \le
+  2\Delta_n .
+\]
+Using the Lipschitz property of \(\Psi\), for every \(x,t\),
+\[
+\begin{aligned}
+  &\abs{F_{\widehat h}^{\circ}(t\mid x)-F_{\bar c}^\circ(t\mid x)} \\
+  &\quad\le
+  \E\left[
+  L_\Psi
+  \abs{\frac{z_x(t)-\varepsilon}{c\kappa_{r_0}}}
+  \abs{\frac{\kappa_{r_0}s(x)}{\widehat s(x)}-1}
+  \middle|X=x
+  \right]  \\
+  &\quad\le
+  \frac{2L_\Psi}{c\kappa_{r_0}}\Delta_n
+  \E\left[
+  \abs{z_x(t)-\varepsilon}
+  \middle|X=x
+  \right].
+\end{aligned}
+\]
+Taking the supremum over \(x\in\Xcal\) and \(t\in\Tcal\), and applying Assumption~\ref{ass:std-moment}, gives
+\[
+  \sup_{x,t}
+  \abs{F_{\widehat h}^{\circ}(t\mid x)-F_{\bar c}^\circ(t\mid x)}
+  \le
+  \frac{2L_\Psi M_{\Tcal}}{c\kappa_{r_0}}\Delta_n
+\]
+with probability tending to one. Assumption~\ref{ass:scale} gives the result.
+
+\subsection{Proof of Proposition~\ref{prop:ckme-exact-cdf}}
+
+For every \(x\in\Xcal\) and \(t\in\Tcal\), the triangle inequality gives
+\[
+\begin{aligned}
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F(t\mid x)}
+  &\le
+  \abs{\widehat F_{h(\cdot)}(t\mid x)
+  -F_{h(\cdot)}^\circ(t\mid x)}\\
+  &\quad+
+  \abs{F_{h(\cdot)}^\circ(t\mid x)-F(t\mid x)}.
+\end{aligned}
+\]
+The reproducing property and Cauchy--Schwarz inequality bound the first term by
+\[
+  \norm{g_{t,h(x)}}_{\Hcal_Y}
+  \norm{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}.
+\]
+For the second term, write
+\[
+\begin{aligned}
+  &F_{h(\cdot)}^\circ(t\mid x)-F(t\mid x)\\
+  &\quad=
+  \int_{\R}
+  \left[
+  \Psi\!\left(\frac{t-y}{h(x)}\right)-\ind\{y\le t\}
+  \right]
+  f(y\mid x)\,dy.
+\end{aligned}
+\]
+The substitution \(u=(t-y)/h(x)\), followed by
+Assumption~\ref{ass:smoothing-bias}, gives
+\[
+  \abs{F_{h(\cdot)}^\circ(t\mid x)-F(t\mid x)}
+  \le
+  B h(x)
+  \int_{\R}\abs{\Psi(u)-\ind\{u\ge0\}}\,du
+  =
+  B C_\Psi h(x).
+\]
+Taking suprema over \(x\) and \(t\) yields the stated bound.
+
+\subsection{Proof of Proposition~\ref{prop:ckme-cdf}}
+
+For every \(x,t\),
+\[
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F_{h(\cdot)}^\circ(t\mid x)}
+  =
+  \abs{\inner{g_{t,h(x)}}{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}}
+  \le
+  \norm{g_{t,h(x)}}_{\Hcal_Y}
+  \norm{\widehat\mu_{Y\mid x}-\mu_{Y\mid x}}_{\Hcal_Y}.
+\]
+Taking suprema and applying Assumptions~\ref{ass:ckme}--\ref{ass:g} gives the result.
+
+\subsection{Proof of Theorem~\ref{thm:group}}
+
+Let
+\[
+  \widehat S(x,y)=S_{\widehat F}(x,y),
+  \qquad
+  S_c^\circ(x,y)=\abs{F_c^\circ(y\mid x)-1/2}.
+\]
+Write \(\Tcal_n=\Tcal\) in the compact-support or global-uniform cases.
+By Proposition~\ref{prop:ckme-cdf} and Proposition~\ref{prop:error-transfer}, there exists a sequence \(r_n=\op(1)\), including the marginal tail term when expanding response ranges are used, such that, with probability tending to one,
+\[
+  \sup_{x\in\Xcal,\ y\in\Tcal}
+  \abs{\widehat S(x,y)-S_c^\circ(x,y)}\le r_n,
+  \qquad
+  \abs{\widehat q_{1-\alpha}-q^\circ_{1-\alpha}}\le r_n.
+\]
+On this event and on \(\{Y\in\Tcal_n\}\), for any group \(\Gcal_k\),
+\[
+\begin{aligned}
+  &\{S_c^\circ(X,Y)\le q^\circ_{1-\alpha}-2r_n\}
+    \cap\{Y\in\Tcal_n\} \\
+  &\quad\subseteq
+    \{\widehat S(X,Y)\le \widehat q_{1-\alpha}\}
+    \cap\{Y\in\Tcal_n\} \\
+  &\quad\subseteq
+    \{S_c^\circ(X,Y)\le q^\circ_{1-\alpha}+2r_n\}
+    \cap\{Y\in\Tcal_n\}.
+\end{aligned}
+\]
+Therefore,
+\[
+\begin{aligned}
+  &\abs{
+  \Pp\{\widehat S(X,Y)\le\widehat q_{1-\alpha}\mid X\in\Gcal_k\}
+  -
+  \Pp\{S_c^\circ(X,Y)\le q^\circ_{1-\alpha}\mid X\in\Gcal_k\}
+  }  \\
+  &\quad\le
+  \sup_{\abs{u-q^\circ_{1-\alpha}}\le 2r_n}
+  \abs{G_k(u)-G_k(q^\circ_{1-\alpha})}
+  +
+  \Pp(Y\notin\Tcal_n\mid X\in\Gcal_k),
+\end{aligned}
+\]
+where \(G_k\) is the groupwise oracle score CDF in Assumption~\ref{ass:group}. For compact support or global uniform control, the tail term is zero. Otherwise it vanishes uniformly over the fixed partition by the range condition in the theorem. The common Lipschitz condition then makes the right-hand side \(\op(1)\), uniformly over the fixed finite set of groups.
+
+It remains to identify the oracle group coverage level. Theorem~\ref{thm:homogeneity} implies that the conditional distribution of \(S_c^\circ(X,Y)\) given \(X=x\) does not depend on \(x\). Hence every group has the same oracle score distribution as the marginal target distribution:
+\[
+  \Pp\{S_c^\circ(X,Y)\le u\mid X\in\Gcal_k\}
+  =
+  \Pp\{S_c^\circ(X,Y)\le u\}.
+\]
+At the continuity point \(q^\circ_{1-\alpha}\), this probability equals \(1-\alpha\). Thus
+\[
+  \max_{1\le k\le K}
+  \abs{
+  \Pp\{Y\in\widehat C(X)\mid X\in\Gcal_k\}
+  -(1-\alpha)
+  }
+  \to 0
+\]
+in probability.
+
+\subsection{Proof of Corollary~\ref{cor:plugin-group}}
+
+Let \(F_{\widehat h}^{\circ}\) denote the plug-in smoothed oracle CDF and let \(F_{\bar c}^\circ\) denote the oracle adaptive smoothed CDF with \(\bar c=c\kappa_{r_0}\). By the assumed uniform CKME consistency for \(F_{\widehat h}^{\circ}\),
+\[
+  \sup_{x,t}
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F_{\widehat h}^{\circ}(t\mid x)}
+  =
+  \op(1).
+\]
+By Proposition~\ref{prop:plugin-oracle},
+\[
+  \sup_{x,t}
+  \abs{F_{\widehat h}^{\circ}(t\mid x)-F_{\bar c}^\circ(t\mid x)}
+  =
+  \op(1).
+\]
+The triangle inequality gives
+\[
+  \sup_{x,t}
+  \abs{\widehat F_{h(\cdot)}(t\mid x)-F_{\bar c}^\circ(t\mid x)}
+  =
+  \op(1).
+\]
+Thus Assumption~\ref{ass:uniform} holds with \(F^\circ=F_{\bar c}^\circ\), up to replacing \(\epsilon_n\) by the sum of the CKME and plug-in scale errors. The proof of Theorem~\ref{thm:group}, with \(c\) replaced by \(\bar c\), then applies verbatim.
+
+\begin{thebibliography}{99}
+
+\bibitem{angelopoulos2023}
+A.~N. Angelopoulos and S.~Bates.
+\newblock Conformal prediction: A gentle introduction.
+\newblock \emph{Foundations and Trends in Machine Learning}, 16(4):494--591, 2023.
+
+\bibitem{ankenman2010}
+B.~Ankenman, B.~L. Nelson, and J.~Staum.
+\newblock Stochastic kriging for simulation metamodeling.
+\newblock \emph{Operations Research}, 58(2):371--382, 2010.
+
+\bibitem{binois2018}
+M.~Binois, R.~B. Gramacy, and M.~Ludkovski.
+\newblock Practical heteroscedastic Gaussian process modeling for large simulation experiments.
+\newblock \emph{Journal of Computational and Graphical Statistics}, 27(4):808--821, 2018.
+
+\bibitem{chernozhukov2021}
+V.~Chernozhukov, K.~Wuthrich, and Y.~Zhu.
+\newblock Distributional conformal prediction.
+\newblock \emph{Proceedings of the National Academy of Sciences}, 118(48):e2107794118, 2021.
+
+\bibitem{gneiting2007}
+T.~Gneiting and A.~E. Raftery.
+\newblock Strictly proper scoring rules, prediction, and estimation.
+\newblock \emph{Journal of the American Statistical Association}, 102(477):359--378, 2007.
+
+\bibitem{hardle1990}
+W.~H\"ardle.
+\newblock \emph{Applied Nonparametric Regression}.
+\newblock Cambridge University Press, 1990.
+
+\bibitem{hore2025}
+R.~Hore and R.~F. Barber.
+\newblock Conformal prediction with local weights: Randomization enables robust guarantees.
+\newblock \emph{Journal of the Royal Statistical Society Series B: Statistical Methodology}, 87(2):549--578, 2025.
+
+\bibitem{lei2018}
+J.~Lei, M.~G'Sell, A.~Rinaldo, R.~J. Tibshirani, and L.~Wasserman.
+\newblock Distribution-free predictive inference for regression.
+\newblock \emph{Journal of the American Statistical Association}, 113(523):1094--1111, 2018.
+
+\bibitem{muandet2017}
+K.~Muandet, K.~Fukumizu, B.~Sriperumbudur, and B.~Scholkopf.
+\newblock Kernel mean embedding of distributions: A review and beyond.
+\newblock \emph{Foundations and Trends in Machine Learning}, 10(1--2):1--141, 2017.
+
+\bibitem{nadaraya1964}
+E.~A. Nadaraya.
+\newblock On estimating regression.
+\newblock \emph{Theory of Probability and Its Applications}, 9(1):141--142, 1964.
+
+\bibitem{papadopoulos2011}
+H.~Papadopoulos, V.~Vovk, and A.~Gammerman.
+\newblock Regression conformal prediction with nearest neighbours.
+\newblock \emph{Journal of Artificial Intelligence Research}, 40:815--840, 2011.
+
+\bibitem{romano2019}
+Y.~Romano, E.~Patterson, and E.~J. Candes.
+\newblock Conformalized quantile regression.
+\newblock \emph{Advances in Neural Information Processing Systems}, 2019.
+
+\bibitem{sacks1989}
+J.~Sacks, W.~J. Welch, T.~J. Mitchell, and H.~P. Wynn.
+\newblock Design and analysis of computer experiments.
+\newblock \emph{Statistical Science}, 4(4):409--423, 1989.
+
+\bibitem{shafer2008}
+G.~Shafer and V.~Vovk.
+\newblock A tutorial on conformal prediction.
+\newblock \emph{Journal of Machine Learning Research}, 9:371--421, 2008.
+
+\bibitem{silverman1986}
+B.~W. Silverman.
+\newblock \emph{Density Estimation for Statistics and Data Analysis}.
+\newblock Chapman and Hall, 1986.
+
+\bibitem{song2013}
+L.~Song, K.~Fukumizu, and A.~Gretton.
+\newblock Kernel embeddings of conditional distributions.
+\newblock \emph{IEEE Signal Processing Magazine}, 30(4):98--111, 2013.
+
+\bibitem{tibshirani2019}
+R.~J. Tibshirani, R.~Foygel Barber, E.~Candes, and A.~Ramdas.
+\newblock Conformal prediction under covariate shift.
+\newblock \emph{Advances in Neural Information Processing Systems}, 2019.
+
+\bibitem{vovk2005}
+V.~Vovk, A.~Gammerman, and G.~Shafer.
+\newblock \emph{Algorithmic Learning in a Random World}.
+\newblock Springer, 2005.
+
+\bibitem{watson1964}
+G.~S. Watson.
+\newblock Smooth regression analysis.
+\newblock \emph{Sankhy\={a}: The Indian Journal of Statistics, Series A}, 26(4):359--372, 1964.
+
+\end{thebibliography}
+
+\end{document}
