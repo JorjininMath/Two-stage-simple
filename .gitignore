@@ -11,10 +11,7 @@ Journal_Ideas_*.md
 # Personal research notes and dissertation materials (local only)
 notes/
 experiments/stock/
-experiment_logs/*
-!experiment_logs/README.md
-!experiment_logs/templates/
-!experiment_logs/templates/**
+experiment_logs/
 
 # Private communication workspaces; keep instructions/templates public.
 research_updates/current/*
